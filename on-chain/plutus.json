@@ -1,0 +1,14 @@
+{
+  "preamble": {
+    "title": "matam/food_supply_chain",
+    "description": "Aiken contracts for project 'matam/food_supply_chain'",
+    "version": "0.0.0",
+    "plutusVersion": "v3",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.1.5+a7741ec"
+    },
+    "license": "Apache-2.0"
+  },
+  "validators": []
+}

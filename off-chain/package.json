@@ -1,0 +1,17 @@
+{
+  "name": "food_supply_chain",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@types/node": "^22.10.6",
+    "lucid-cardano": "^0.10.11"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
