@@ -10,5 +10,43 @@
     },
     "license": "Apache-2.0"
   },
-  "validators": []
+  "validators": [
+    {
+      "title": "user_nfts.user_nfts.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "parameters": [
+        {
+          "title": "token_name",
+          "schema": {
+            "$ref": "#/definitions/ByteArray"
+          }
+        },
+        {
+          "title": "verification_key_hashes",
+          "schema": {
+            "$ref": "#/definitions/List$VerificationKeyHash"
+          }
+        }
+      ],
+      "compiledCode": "583c010100323232322322322533300632323232326300c300d002300b001300b00230090013007375400229309b2b1bac001375c002ae6955cf2ba15745",
+      "hash": "5d4f2c4096629700dd0991dca72dc4544f36596e377ad0885f481ff0"
+    }
+  ],
+  "definitions": {
+    "ByteArray": {
+      "dataType": "bytes"
+    },
+    "List$VerificationKeyHash": {
+      "dataType": "list",
+      "items": {
+        "$ref": "#/definitions/VerificationKeyHash"
+      }
+    },
+    "VerificationKeyHash": {
+      "title": "VerificationKeyHash",
+      "dataType": "bytes"
+    }
+  }
 }
