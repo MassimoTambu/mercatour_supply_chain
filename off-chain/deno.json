@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "@emurgo/cardano-serialization-lib-nodejs": "npm:@emurgo/cardano-serialization-lib-nodejs@^13.2.1",
+    "lucid-cardano": "npm:lucid-cardano@^0.10.11",
+    "sqlite3": "npm:sqlite3@^5.1.7"
+  }
+}

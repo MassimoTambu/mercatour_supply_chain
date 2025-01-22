@@ -1,7 +1,5 @@
-import dotenv from "dotenv";
-import { getFundWallet } from "./cardano_utils";
-
-dotenv.config();
+import { getFundWallet } from "./cardano_utils.ts";
+import { Buffer } from 'node:buffer';
 
 const wallet = getFundWallet();
 const vkhHex = Buffer.from(wallet.verificationKey.hash().to_bytes()).toString('hex');

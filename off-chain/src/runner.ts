@@ -1,5 +1,5 @@
-import { insertWallet } from "./db/queries";
-import { createWallet } from "./cardano_utils";
+import { insertWallet } from "./db/queries.ts";
+import { createWallet } from "./cardano_utils.ts";
 import { Blockfrost, Lucid, Network } from "lucid-cardano";
 import * as sqlite3 from 'sqlite3';
 
@@ -16,30 +16,33 @@ export class SupplyChainRunner {
   };
 
   private async getLucid(): Promise<void> {
-    if (process.env.BLOCKFROST_PROJECT_ID === undefined) {
+    const bfProjectId = Deno.env.get("BLOCKFROST_PROJECT_ID");
+    if (bfProjectId === undefined) {
       throw new Error("BLOCKFROST_PROJECT_ID is not defined");
     }
     const networks: Network[] = ["Mainnet", "Preview", "Preprod", "Custom"];
-    if (!networks.includes(process.env.LUCID_NETWORK as Network)) {
-      throw new Error("LUCID_NETWORK is not a valid Network type. Value is: " + process.env.LUCID_NETWORK);
+    const lucidNetwork = Deno.env.get("LUCID_NETWORK") as Network;
+    if (!networks.includes(lucidNetwork)) {
+      throw new Error("LUCID_NETWORK is not a valid Network type. Value is: " + lucidNetwork);
     }
 
     this.lucid = await Lucid.new(
       new Blockfrost(
-        `https://cardano-${process.env.LUCID_NETWORK!.toLowerCase()}.blockfrost.io/api/v0`,
-        process.env.BLOCKFROST_PROJECT_ID
+        `https://cardano-${lucidNetwork.toLowerCase()}.blockfrost.io/api/v0`,
+        bfProjectId
       ),
-      process.env.LUCID_NETWORK as Network,
+      lucidNetwork,
     );
   }
 
   private openDatabase(): void {
-    if (process.env.DB_FILE_NAME === undefined) {
+    const dbFileName = Deno.env.get("DB_FILE_NAME");
+    if (dbFileName === undefined) {
       throw new Error("DB_FILE_NAME is not defined");
     }
 
     sqlite3.verbose()
-    this.db = new sqlite3.Database(process.env.DB_FILE_NAME);
+    this.db = new sqlite3.Database(dbFileName);
   }
 
   private closeDatabase(): void {

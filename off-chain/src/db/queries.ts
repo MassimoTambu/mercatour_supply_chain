@@ -1,5 +1,5 @@
 import { RunResult, Database } from "sqlite3";
-import { SupplyChainWallet } from "../interfaces/wallet";
+import { SupplyChainWallet } from "../interfaces/wallet.ts";
 
 export function initializeDatabase(db: Database): void {
   // Initialize the database

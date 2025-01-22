@@ -1,31 +1,45 @@
 {
+   // Use IntelliSense to learn about possible attributes.
+   // Hover to view descriptions of existing attributes.
+   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
    "version": "0.2.0",
    "configurations": [
       {
-         "type": "node",
          "request": "launch",
-         "name": "Start Project",
-         "runtimeExecutable": "npm",
+         "name": "Run index.ts",
+         "type": "node",
+         "program": "${workspaceFolder}/src/index.ts",
+         "cwd": "${workspaceFolder}",
+         "env": {},
+         "runtimeExecutable": "/Users/massimotamburini/.deno/bin/deno",
          "runtimeArgs": [
-            "run-script",
-            "start"
+            "run",
+            "--unstable",
+            "--inspect-wait",
+            "--allow-all",
+            "--env-file=.env",
+            "src/index.ts",
          ],
-         "sourceMaps": true,
-         "smartStep": true,
-         "internalConsoleOptions": "openOnSessionStart",
-         "outFiles": [
-             "${workspaceFolder}/dist/**/*.js"
+         "attachSimplePort": 9229
+      },
+      {
+         "request": "launch",
+         "name": "Create parameterized user certificate validator",
+         "type": "node",
+         // "program": "${workspaceFolder}/apply_params_to_validator.ts",
+         "cwd": "${workspaceFolder}",
+         "env": {},
+         "runtimeExecutable": "/Users/massimotamburini/.deno/bin/deno",
+         "runtimeArgs": [
+            "run",
+            "--unstable",
+            "--inspect-wait",
+            "--allow-all",
+            "--env-file=.env",
+            "src/user_certificate/apply_params_to_validator.ts",
+            "./output.json"
          ],
-         "skipFiles": [
-            "<node_internals>/**"
-         ],
-         "sourceMapPathOverrides": {
-            "webpack:///src/*": "${workspaceFolder}/src/*"
-         },
-         "resolveSourceMapLocations": [
-            "${workspaceFolder}/**",
-            "!**/node_modules/**"
-         ]
+         "attachSimplePort": 9229
       }
    ]
 }

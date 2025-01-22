@@ -1,24 +1,27 @@
 import * as Cardano from '@emurgo/cardano-serialization-lib-nodejs';
-import { SupplyChainWallet } from './interfaces/wallet';
+import { SupplyChainWallet } from './interfaces/wallet.ts';
 import { Lucid } from 'lucid-cardano';
 
 export function getFundWallet(): SupplyChainWallet {
-  if (process.env.FUND_ADDRESS === undefined) {
+  const fundAddress = Deno.env.get("FUND_ADDRESS");
+  if (fundAddress === undefined) {
     throw new Error('FUND_ADDRESS is not defined');
   }
 
-  if (process.env.FUND_SIGNING_KEY === undefined) {
+  const fundSigningKey = Deno.env.get("FUND_SIGNING_KEY");
+  if (fundSigningKey === undefined) {
     throw new Error('FUND_SIGNING_KEY is not defined');
   }
 
-  if (process.env.FUND_VERIFICATION_KEY === undefined) {
+  const fundVerificationKey = Deno.env.get("FUND_VERIFICATION_KEY");
+  if (fundVerificationKey === undefined) {
     throw new Error('FUND_VERIFICATION_KEY is not defined');
   }
 
   return {
-    paymentAddress: Cardano.Address.from_bech32(process.env.FUND_ADDRESS),
-    signingKey: Cardano.PrivateKey.from_bech32(process.env.FUND_SIGNING_KEY),
-    verificationKey: Cardano.PublicKey.from_bech32(process.env.FUND_VERIFICATION_KEY),
+    paymentAddress: Cardano.Address.from_bech32(fundAddress),
+    signingKey: Cardano.PrivateKey.from_bech32(fundSigningKey),
+    verificationKey: Cardano.PublicKey.from_bech32(fundVerificationKey),
   };
 }
 
