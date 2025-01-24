@@ -1,3 +1,4 @@
+use aiken/cbor
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{PolicyId}
@@ -14,4 +15,10 @@ validator user_nfts(verification_key_hashes: List<VerificationKeyHash>) {
   else(_) {
     fail
   }
+}
+
+test serialize_verification_key_hashes() {
+  let vkh: List<VerificationKeyHash> =
+    [#"14852fef5f1ffefd230108d16eab932863a2158b23ff935e4e4f13d6"]
+  cbor.serialise(vkh) == #"9f581c14852fef5f1ffefd230108d16eab932863a2158b23ff935e4e4f13d6ff"
 }

@@ -24,9 +24,8 @@
       },
       {
          "request": "launch",
-         "name": "Create parameterized user certificate validator",
+         "name": "Generate parameterized user certificate validator",
          "type": "node",
-         // "program": "${workspaceFolder}/apply_params_to_validator.ts",
          "cwd": "${workspaceFolder}",
          "env": {},
          "runtimeExecutable": "/Users/massimotamburini/.deno/bin/deno",
@@ -37,6 +36,24 @@
             "--allow-all",
             "--env-file=.env",
             "src/user_certificate/apply_params_to_validator.ts",
+            "./output.json"
+         ],
+         "attachSimplePort": 9229
+      },
+      {
+         "request": "launch",
+         "name": "Generate user certificate policy id",
+         "type": "node",
+         "cwd": "${workspaceFolder}",
+         "env": {},
+         "runtimeExecutable": "/Users/massimotamburini/.deno/bin/deno",
+         "runtimeArgs": [
+            "run",
+            "--unstable",
+            "--inspect-wait",
+            "--allow-all",
+            "--env-file=.env",
+            "src/user_certificate/generate_policy_id.ts",
             "./output.json"
          ],
          "attachSimplePort": 9229
