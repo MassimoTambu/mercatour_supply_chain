@@ -14,7 +14,6 @@
          "runtimeExecutable": "/Users/massimotamburini/.deno/bin/deno",
          "runtimeArgs": [
             "run",
-            "--unstable",
             "--inspect-wait",
             "--allow-all",
             "--env-file=.env",
@@ -31,7 +30,6 @@
          "runtimeExecutable": "/Users/massimotamburini/.deno/bin/deno",
          "runtimeArgs": [
             "run",
-            "--unstable",
             "--inspect-wait",
             "--allow-all",
             "--env-file=.env",
@@ -48,7 +46,6 @@
          "runtimeExecutable": "/Users/massimotamburini/.deno/bin/deno",
          "runtimeArgs": [
             "run",
-            "--unstable",
             "--inspect-wait",
             "--allow-all",
             "--env-file=.env",

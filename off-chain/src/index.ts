@@ -1,3 +1,4 @@
+import { SupplyChainRunner } from "./runner.ts";
 import { SU } from "./simulator_utils.ts";
 import { Buffer } from 'node:buffer';
 
@@ -5,6 +6,8 @@ const wallet = SU.getFundWallet();
 const vkhHex = Buffer.from(wallet.verificationKey.hash().to_bytes()).toString('hex');
 console.log(vkhHex);
 
+const runner = await SupplyChainRunner.init();
+runner.createUserNFTCertificate();
 
 
 // TODO initialize the database

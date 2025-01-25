@@ -1,11 +1,6 @@
-import { applyParamsToScript } from 'lucid-cardano';
+import { applyParamsToScript } from '@lucid-evolution/utils';
 import { SU } from "../simulator_utils.ts";
-
-interface ConvertedBlueprint {
-  "type": string;
-  "description": string;
-  "cborHex": string;
-}
+import { ConvertedBlueprint } from "../interfaces/converted_blueprint.ts";
 
 // * For now, we will only use one verification key hash.
 const verificationKeyHash = SU.getEnvVar("FUND_VERIFICATION_KEY_HASH");

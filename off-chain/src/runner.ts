@@ -1,10 +1,11 @@
-import { insertWallet } from "./db/queries.ts";
+import { insertWallet } from "./queries.ts";
 import { SU } from "./simulator_utils.ts";
-import { Blockfrost, Lucid, networkToId } from "lucid-cardano";
+import { Lucid, LucidEvolution } from "@lucid-evolution/lucid";
+import { Blockfrost } from "@lucid-evolution/provider";
 import * as sqlite3 from 'sqlite3';
 
 export class SupplyChainRunner {
-  private lucid: Lucid = null!;
+  private lucid: LucidEvolution = null!;
   private db: sqlite3.Database = null!;
 
   private constructor() { }
@@ -17,7 +18,7 @@ export class SupplyChainRunner {
 
   private async getLucid(): Promise<void> {
     const bfProjectId = SU.getEnvVar("BLOCKFROST_PROJECT_ID");
-    this.lucid = await Lucid.new(
+    this.lucid = await Lucid(
       new Blockfrost(
         `https://cardano-preview.blockfrost.io/api/v0`,
         bfProjectId
@@ -28,18 +29,11 @@ export class SupplyChainRunner {
 
   private openDatabase(): void {
     const dbFileName = SU.getEnvVar("DB_FILE_NAME");
-    sqlite3.verbose()
     this.db = new sqlite3.Database(dbFileName);
   }
 
   private closeDatabase(): void {
-    this.db.close((err) => {
-      if (err) {
-        console.error('Error closing the database connection:', err.message);
-      } else {
-        console.log('Database connection closed.');
-      }
-    });
+    this.db.close();
   }
 
   createWallets(number: number): void {
@@ -55,15 +49,10 @@ export class SupplyChainRunner {
     insertWallet(this.db, wallet);
   }
 
-  createCertificate(): void {
-    const networkId = networkToId('Preview');
-    const signerKey = SU.getEnvVar("FUND_SIGNING_KEY");
+  createUserNFTCertificate(): void {
+    SU.createUserNFTCertificate(this.lucid);
 
-    this.lucid.newTx()
-      .addNetworkId(networkId)
-      .addSignerKey(signerKey)
-
-    this.openDatabase();
-    this.closeDatabase();
+    // this.openDatabase();
+    // this.closeDatabase();
   }
 }
