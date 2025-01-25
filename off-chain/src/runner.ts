@@ -1,6 +1,6 @@
 import { insertWallet } from "./db/queries.ts";
-import { createWallet } from "./cardano_utils.ts";
-import { Blockfrost, Lucid, Network } from "lucid-cardano";
+import { SU } from "./simulator_utils.ts";
+import { Blockfrost, Lucid, networkToId } from "lucid-cardano";
 import * as sqlite3 from 'sqlite3';
 
 export class SupplyChainRunner {
@@ -16,31 +16,18 @@ export class SupplyChainRunner {
   };
 
   private async getLucid(): Promise<void> {
-    const bfProjectId = Deno.env.get("BLOCKFROST_PROJECT_ID");
-    if (bfProjectId === undefined) {
-      throw new Error("BLOCKFROST_PROJECT_ID is not defined");
-    }
-    const networks: Network[] = ["Mainnet", "Preview", "Preprod", "Custom"];
-    const lucidNetwork = Deno.env.get("LUCID_NETWORK") as Network;
-    if (!networks.includes(lucidNetwork)) {
-      throw new Error("LUCID_NETWORK is not a valid Network type. Value is: " + lucidNetwork);
-    }
-
+    const bfProjectId = SU.getEnvVar("BLOCKFROST_PROJECT_ID");
     this.lucid = await Lucid.new(
       new Blockfrost(
-        `https://cardano-${lucidNetwork.toLowerCase()}.blockfrost.io/api/v0`,
+        `https://cardano-preview.blockfrost.io/api/v0`,
         bfProjectId
       ),
-      lucidNetwork,
+      'Preview',
     );
   }
 
   private openDatabase(): void {
-    const dbFileName = Deno.env.get("DB_FILE_NAME");
-    if (dbFileName === undefined) {
-      throw new Error("DB_FILE_NAME is not defined");
-    }
-
+    const dbFileName = SU.getEnvVar("DB_FILE_NAME");
     sqlite3.verbose()
     this.db = new sqlite3.Database(dbFileName);
   }
@@ -64,14 +51,19 @@ export class SupplyChainRunner {
   }
 
   private newWallet(): void {
-    const wallet = createWallet();
+    const wallet = SU.createWallet();
     insertWallet(this.db, wallet);
   }
 
   createCertificate(): void {
-    // TODO
-    this.openDatabase();
+    const networkId = networkToId('Preview');
+    const signerKey = SU.getEnvVar("FUND_SIGNING_KEY");
 
+    this.lucid.newTx()
+      .addNetworkId(networkId)
+      .addSignerKey(signerKey)
+
+    this.openDatabase();
     this.closeDatabase();
   }
 }

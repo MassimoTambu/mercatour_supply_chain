@@ -1,9 +1,7 @@
+import { SU } from "../simulator_utils.ts";
+
 // * For now, we will only use one serialized verification key.
-const serialized_verification_keys = Deno.env.get("FUND_SERIALIZED_VERIFICATION_KEY");
-if (serialized_verification_keys == undefined) {
-  console.error("Please set the FUND_SERIALIZED_VERIFICATION_KEY in the env file.");
-  Deno.exit(1);
-}
+const serialized_verification_keys = SU.getEnvVar("FUND_SERIALIZED_VERIFICATION_KEY");
 
 const generateParameterizedPlutusJson = new Deno.Command("aiken", {
   args: ["blueprint", "apply", serialized_verification_keys, "-m", "user_nfts", "-v", "user_nfts.mint"],
@@ -37,5 +35,6 @@ if (code !== 0) {
 const policyId = new TextDecoder().decode(stdout);
 console.log("Policy ID generated: " + policyId);
 
+Deno.writeTextFileSync("generated/user_nfts_policy_id", policyId);
 Deno.removeSync("../on-chain/plutus.json");
 Deno.renameSync("../on-chain/plutus_temp.json", "../on-chain/plutus.json");

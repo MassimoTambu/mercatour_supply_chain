@@ -35,8 +35,7 @@
             "--inspect-wait",
             "--allow-all",
             "--env-file=.env",
-            "src/user_certificate/apply_params_to_validator.ts",
-            "./output.json"
+            "src/user_certificate/apply_params_to_validator.ts"
          ],
          "attachSimplePort": 9229
       },
@@ -54,7 +53,6 @@
             "--allow-all",
             "--env-file=.env",
             "src/user_certificate/generate_policy_id.ts",
-            "./output.json"
          ],
          "attachSimplePort": 9229
       }

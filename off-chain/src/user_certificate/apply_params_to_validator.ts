@@ -1,4 +1,5 @@
 import { applyParamsToScript } from 'lucid-cardano';
+import { SU } from "../simulator_utils.ts";
 
 interface ConvertedBlueprint {
   "type": string;
@@ -6,19 +7,9 @@ interface ConvertedBlueprint {
   "cborHex": string;
 }
 
-if (Deno.args.length !== 1) {
-  console.error("Please provide the validator file and the output file path.");
-  Deno.exit(1);
-}
-
 // * For now, we will only use one verification key hash.
-const verificationKeyHash = Deno.env.get("FUND_VERIFICATION_KEY_HASH");
-if (verificationKeyHash == undefined) {
-  console.error("Please set the FUND_VERIFICATION_KEY_HASH in the env file.");
-  Deno.exit(1);
-}
-
-const paramsValidatorOutputFile: string = Deno.args[0];
+const verificationKeyHash = SU.getEnvVar("FUND_VERIFICATION_KEY_HASH");
+const paramsValidatorOutputFile = 'generated/user_nfts_mint_validator_params.json';
 
 function getValidator(): ConvertedBlueprint {
   const cmd = new Deno.Command("aiken", {
@@ -55,4 +46,4 @@ function writeJson(filePath: string, value: ConvertedBlueprint) {
 
 writeJson(paramsValidatorOutputFile, userCertNFTValidatorParams);
 
-console.log("PARAMETERIZED VALIDATOR CREATED!");
+console.log("Parameterized validator generated!");

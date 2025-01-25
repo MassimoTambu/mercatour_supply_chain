@@ -1,7 +1,7 @@
-import { getFundWallet } from "./cardano_utils.ts";
+import { SU } from "./simulator_utils.ts";
 import { Buffer } from 'node:buffer';
 
-const wallet = getFundWallet();
+const wallet = SU.getFundWallet();
 const vkhHex = Buffer.from(wallet.verificationKey.hash().to_bytes()).toString('hex');
 console.log(vkhHex);
 
