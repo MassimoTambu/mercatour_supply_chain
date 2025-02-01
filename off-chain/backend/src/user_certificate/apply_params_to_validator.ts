@@ -9,7 +9,7 @@ const paramsValidatorOutputFile = 'generated/user_nfts_mint_validator_params.jso
 function getValidator(): ConvertedBlueprint {
   const cmd = new Deno.Command("aiken", {
     args: ["blueprint", "convert", "-m", "user_nfts", "-v", "user_nfts.mint"],
-    cwd: "../on-chain/",
+    cwd: "../../on-chain/",
   });
   const { stdout, stderr, code } = cmd.outputSync();
 

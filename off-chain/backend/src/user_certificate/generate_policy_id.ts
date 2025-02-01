@@ -5,7 +5,7 @@ const serialized_verification_keys = SU.getEnvVar("FUND_SERIALIZED_VERIFICATION_
 
 const generateParameterizedPlutusJson = new Deno.Command("aiken", {
   args: ["blueprint", "apply", serialized_verification_keys, "-m", "user_nfts", "-v", "user_nfts.mint"],
-  cwd: "../on-chain/",
+  cwd: "../../on-chain/",
 });
 
 let { stdout, stderr, code } = await generateParameterizedPlutusJson.output();
@@ -16,15 +16,15 @@ if (code !== 0) {
 
 const parameterizedPlutusJson = new TextDecoder().decode(stdout);
 
-Deno.renameSync("../on-chain/plutus.json", "../on-chain/plutus_temp.json");
+Deno.renameSync("../../on-chain/plutus.json", "../../on-chain/plutus_temp.json");
 
 const encoder = new TextEncoder();
 const plutusJson = encoder.encode(parameterizedPlutusJson);
-Deno.writeFileSync("../on-chain/plutus.json", plutusJson);
+Deno.writeFileSync("../../on-chain/plutus.json", plutusJson);
 
 const generatePolicyId = new Deno.Command("aiken", {
   args: ["blueprint", "policy", "-m", "user_nfts", "-v", "user_nfts.mint"],
-  cwd: "../on-chain/",
+  cwd: "../../on-chain/",
 });
 ({ stdout, stderr, code } = await generatePolicyId.output());
 if (code !== 0) {
@@ -36,5 +36,5 @@ const policyId = new TextDecoder().decode(stdout);
 console.log("Policy ID generated: " + policyId);
 
 Deno.writeTextFileSync("generated/user_nfts_policy_id", policyId);
-Deno.removeSync("../on-chain/plutus.json");
-Deno.renameSync("../on-chain/plutus_temp.json", "../on-chain/plutus.json");
+Deno.removeSync("../../on-chain/plutus.json");
+Deno.renameSync("../../on-chain/plutus_temp.json", "../../on-chain/plutus.json");

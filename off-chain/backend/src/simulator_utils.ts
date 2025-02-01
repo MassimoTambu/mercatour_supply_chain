@@ -113,7 +113,7 @@ export class SU {
   }
 
   private static getPlutusMintCompiledCode(): string {
-    const validatorBlueprint = JSON.parse(Deno.readTextFileSync('../on-chain/plutus.json')) as PlutusJson;
+    const validatorBlueprint = JSON.parse(Deno.readTextFileSync('../../on-chain/plutus.json')) as PlutusJson;
     return validatorBlueprint.validators.find((v) => (v.title).endsWith('.mint'))!.compiledCode;
   }
 
