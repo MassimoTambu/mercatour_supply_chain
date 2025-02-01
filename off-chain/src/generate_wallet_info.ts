@@ -2,6 +2,7 @@ import { SU } from "./simulator_utils.ts";
 
 const wallet = SU.generateWallet();
 console.log("Wallet Details:");
+console.log("Seed Phrase:", wallet.seedPhrase);
 console.log("Payment Address:", wallet.address);
 console.log("Signing Key (Private Key):", wallet.paymentKey);
 console.log("Verification Key (Public Key):", wallet.verificationKey);

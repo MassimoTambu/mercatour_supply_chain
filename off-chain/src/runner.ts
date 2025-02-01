@@ -1,8 +1,10 @@
-import { insertWallet } from "./queries.ts";
+import { initializeDatabase, insertUserNFTCertificate, insertWallet } from "./queries.ts";
 import { SU } from "./simulator_utils.ts";
 import { Lucid, LucidEvolution } from "@lucid-evolution/lucid";
 import { Blockfrost } from "@lucid-evolution/provider";
 import * as sqlite3 from 'sqlite3';
+import { SupplyChainWallet } from "./interfaces/supply_chain_wallet.ts";
+import { Address } from "@lucid-evolution/core-types";
 
 export class SupplyChainRunner {
   private lucid: LucidEvolution = null!;
@@ -12,6 +14,9 @@ export class SupplyChainRunner {
 
   public static init = async () => {
     const runner = new SupplyChainRunner();
+    runner.openDatabase();
+    initializeDatabase(runner.db);
+    runner.closeDatabase();
     await runner.getLucid();
     return runner;
   };
@@ -36,23 +41,27 @@ export class SupplyChainRunner {
     this.db.close();
   }
 
-  createWallets(number: number): void {
+  createWallets(number: number): SupplyChainWallet[] {
+    const wallets: SupplyChainWallet[] = [];
     this.openDatabase();
     for (let i = 0; i < number; i++) {
-      this.newWallet();
+      wallets.push(this.newWallet());
     }
     this.closeDatabase();
+    return wallets;
   }
 
-  private newWallet(): void {
+  private newWallet(): SupplyChainWallet {
     const wallet = SU.generateWallet();
     insertWallet(this.db, wallet);
+    return wallet;
   }
 
-  async createUserNFTCertificate(): Promise<void> {
-    await SU.createUserNFTCertificate(this.lucid);
-
-    // this.openDatabase();
-    // this.closeDatabase();
+  async createUserNFTCertificate(receiverAddress: Address): Promise<void> {
+    this.openDatabase();
+    const txHash = await SU.createUserNFTCertificate(this.lucid, receiverAddress);
+    const expiration = SU.getEnvVar("USER_NFT_CERTIFICATE_EXPIRATION");
+    insertUserNFTCertificate(this.db, txHash, receiverAddress, expiration);
+    this.closeDatabase();
   }
 }

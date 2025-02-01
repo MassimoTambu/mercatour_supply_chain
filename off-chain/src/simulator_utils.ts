@@ -2,7 +2,7 @@ import { SupplyChainWallet } from './interfaces/supply_chain_wallet.ts';
 import { LucidEvolution, walletFromSeed } from '@lucid-evolution/lucid';
 import { fromText } from '@lucid-evolution/core-utils';
 import { Data } from '@lucid-evolution/plutus';
-import { AddressDetails, MintingPolicy } from "@lucid-evolution/core-types";
+import { Address, AddressDetails, MintingPolicy } from "@lucid-evolution/core-types";
 import { applyDoubleCborEncoding, applyParamsToScript, generateSeedPhrase, getAddressDetails, mintingPolicyToId, toPublicKey } from "@lucid-evolution/utils";
 import { PlutusJson } from "./interfaces/plutus_json.ts";
 
@@ -18,9 +18,9 @@ export class SU {
   static generateWallet(): SupplyChainWallet {
     const seedPhrase = generateSeedPhrase();
 
-    console.log("Wallet seedPhrase:", seedPhrase);
     const wallet = walletFromSeed(seedPhrase, { network: 'Preview' });
     const addressDetails: AddressDetails = getAddressDetails(wallet.address);
+    console.log(`Wallet created with address: ${wallet.address}`);
     return {
       ...wallet,
       seedPhrase,
@@ -74,9 +74,9 @@ export class SU {
 
   // * In this new implementation, the policyId is generated in the code itself
   // * and the validator blueprint is read from the plutus.json file.
-  static async createUserNFTCertificate(lucid: LucidEvolution): Promise<void> {
+  static async createUserNFTCertificate(lucid: LucidEvolution, receiverAddress: Address): Promise<string> {
     const fundWallet = SU.getFundWallet();
-    const tokenName = SU.getEnvVar("USER_NFT_CERTIFICATE_NAME");
+    const tokenName = SU.getEnvVar("USER_NFT_CERTIFICATE_TOKEN_NAME");
     const mintCompiledCode = SU.getPlutusMintCompiledCode();
     const mintingPolicy: MintingPolicy = {
       type: "PlutusV3", script:
@@ -91,24 +91,25 @@ export class SU {
 
     const metadataCBOR = SU.generateMetadata();
     const unit = policyId + fromText(tokenName);
-    const date = new Date();
-    date.setHours(date.getHours() + 1);
+    // const date = new Date();
+    // date.setHours(date.getHours() + 1);
 
     lucid.selectWallet.fromSeed(fundWallet.seedPhrase);
 
     const tx = await lucid.newTx()
       .addSigner(fundWallet.address)
       .mintAssets({ [unit]: 1n }, redeemer)
-      .pay.ToAddressWithData(fundWallet.address,
+      .pay.ToAddressWithData(receiverAddress,
         { kind: "inline", value: metadataCBOR },
         { [unit]: 1n })
-      .validTo(date.getTime())
+      // .validTo(date.getTime())
       .attach.MintingPolicy(mintingPolicy)
       .complete();
 
     const signedTx = await tx.sign.withPrivateKey(fundWallet.paymentKey).complete();
     const txHash = await signedTx.submit();
     console.log(`User NFT Certificate minted with tx hash: ${txHash}`);
+    return txHash;
   }
 
   private static getPlutusMintCompiledCode(): string {
@@ -127,9 +128,11 @@ export class SU {
     const metadataMap = new Map();
     // TODO take next id from the database
     // id: 1,
-    metadataMap.set(fromText("name"), Data.to(fromText("Mercatour 2025 Supplychain User Certificate")));
-    metadataMap.set(fromText("description"), Data.to(fromText("This NFT certficates that the possessor can use the Mercatour Supplychain for the year 2025.")));
-    metadataMap.set(fromText("image"), Data.to(fromText("https://waapple.org/wp-content/uploads/2021/06/Variety_Cosmic-Crisp-transparent-658x677.png")));
+    metadataMap.set(fromText("name"), Data.to(fromText(SU.getEnvVar("USER_NFT_CERTIFICATE_NAME"))));
+    metadataMap.set(fromText("description"), Data.to(fromText(SU.getEnvVar("USER_NFT_CERTIFICATE_DESCRIPTION"))));
+    metadataMap.set(fromText("image"), Data.to(fromText(SU.getEnvVar("USER_NFT_CERTIFICATE_IMAGE"))));
+    // ? Should this be converted to a number?
+    metadataMap.set(fromText("expiration"), Data.to(fromText(SU.getEnvVar("USER_NFT_CERTIFICATE_EXPIRATION"))));
     // TODO get entity name and address from the database
     // entity: {
     //   name: "Salami Inc.",
