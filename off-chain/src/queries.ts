@@ -1,5 +1,5 @@
 import { Database } from "sqlite3";
-import { SupplyChainWallet } from "./interfaces/wallet.ts";
+import { SupplyChainWallet } from "./interfaces/supply_chain_wallet.ts";
 
 export function initializeDatabase(db: Database): void {
   console.log('Initializing the database...');
@@ -23,8 +23,8 @@ export function insertWallet(db: Database, wallet: SupplyChainWallet): void {
   console.log('Inserting wallet into the database...');
   db.exec(
     'INSERT INTO users (payment_address, signing_key, verification_key) VALUES (?, ?, ?)',
-    wallet.paymentAddress.to_bech32(),
-    wallet.signingKey.to_bech32(),
-    wallet.verificationKey.to_bech32(),
+    wallet.address,
+    wallet.paymentKey,
+    wallet.verificationKey,
   );
 }

@@ -1,7 +1,6 @@
 {
   "imports": {
     "sqlite3": "https://deno.land/x/sqlite3@0.12.0/mod.ts",
-    "@emurgo/cardano-serialization-lib-nodejs": "npm:@emurgo/cardano-serialization-lib-nodejs@^13.2.1",
     "@lucid-evolution/lucid": "npm:@lucid-evolution/lucid@^0.4.20",
     "@lucid-evolution/provider": "npm:@lucid-evolution/provider@^0.1.85",
     "@lucid-evolution/core-types": "npm:@lucid-evolution/core-types@^0.1.21",

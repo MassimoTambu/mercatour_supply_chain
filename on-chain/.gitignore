@@ -6,3 +6,5 @@ build/
 docs/
 # Aiken's default coverage export
 plutus.json
+
+.env

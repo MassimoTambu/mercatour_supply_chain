@@ -45,12 +45,12 @@ export class SupplyChainRunner {
   }
 
   private newWallet(): void {
-    const wallet = SU.createWallet();
+    const wallet = SU.generateWallet();
     insertWallet(this.db, wallet);
   }
 
-  createUserNFTCertificate(): void {
-    SU.createUserNFTCertificate(this.lucid);
+  async createUserNFTCertificate(): Promise<void> {
+    await SU.createUserNFTCertificate(this.lucid);
 
     // this.openDatabase();
     // this.closeDatabase();

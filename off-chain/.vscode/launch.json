@@ -23,6 +23,22 @@
       },
       {
          "request": "launch",
+         "name": "Generate Wallet Info",
+         "type": "node",
+         "cwd": "${workspaceFolder}",
+         "env": {},
+         "runtimeExecutable": "/Users/massimotamburini/.deno/bin/deno",
+         "runtimeArgs": [
+            "run",
+            "--inspect-wait",
+            "--allow-all",
+            "--env-file=.env",
+            "src/generate_wallet_info.ts",
+         ],
+         "attachSimplePort": 9229
+      },
+      {
+         "request": "launch",
          "name": "Generate parameterized user certificate validator",
          "type": "node",
          "cwd": "${workspaceFolder}",
