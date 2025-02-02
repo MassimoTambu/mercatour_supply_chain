@@ -1,9 +1,9 @@
 import { SupplyChainWallet } from './interfaces/supply_chain_wallet.ts';
 import { LucidEvolution, walletFromSeed } from '@lucid-evolution/lucid';
 import { fromText } from '@lucid-evolution/core-utils';
-import { Data } from '@lucid-evolution/plutus';
-import { Address, AddressDetails, MintingPolicy } from "@lucid-evolution/core-types";
-import { applyDoubleCborEncoding, applyParamsToScript, generateSeedPhrase, getAddressDetails, mintingPolicyToId, toPublicKey } from "@lucid-evolution/utils";
+import { Constr, Data } from '@lucid-evolution/plutus';
+import { Address, AddressDetails, MintingPolicy, SpendingValidator } from "@lucid-evolution/core-types";
+import { applyDoubleCborEncoding, applyParamsToScript, generateSeedPhrase, getAddressDetails, mintingPolicyToId, toPublicKey, toUnit, validatorToAddress } from "@lucid-evolution/utils";
 import { PlutusJson } from "./interfaces/plutus_json.ts";
 
 export class SU {
@@ -74,39 +74,58 @@ export class SU {
 
   // * In this new implementation, the policyId is generated in the code itself
   // * and the validator blueprint is read from the plutus.json file.
-  static async createUserNFTCertificate(lucid: LucidEvolution, receiverAddress: Address): Promise<string> {
+  static async createUserNFTCertificates(lucid: LucidEvolution, receiverAddresses: Address[]): Promise<string> {
     const fundWallet = SU.getFundWallet();
     const tokenName = SU.getEnvVar("USER_NFT_CERTIFICATE_TOKEN_NAME");
     const mintCompiledCode = SU.getPlutusMintCompiledCode();
-    const mintingPolicy: MintingPolicy = {
-      type: "PlutusV3", script:
-        applyParamsToScript(
-          applyDoubleCborEncoding(mintCompiledCode),
-          [[fundWallet.verificationKeyHash]]
-        ),
-    };
+    const script = applyParamsToScript(
+      applyDoubleCborEncoding(mintCompiledCode),
+      [[fundWallet.verificationKeyHash]]
+    );
+    const spendingValidator: SpendingValidator = { type: "PlutusV3", script };
+    const mintingPolicy: MintingPolicy = { type: "PlutusV3", script };
 
     const policyId = mintingPolicyToId(mintingPolicy);
     const redeemer = Data.void();
 
-    const metadataCBOR = SU.generateMetadata();
-    const unit = policyId + fromText(tokenName);
+    const datum = SU.generateCIP68Metadata();
+    const validatorAddress = validatorToAddress('Preview', spendingValidator);
+    const assetName = fromText(tokenName);
+    const refUnit = toUnit(policyId, assetName, 100); // label 100 is dedicated for Reference NFT
+    const userUnit = toUnit(policyId, assetName, 222); // label 222 is dedicated for NFT
     // const date = new Date();
     // date.setHours(date.getHours() + 1);
 
     lucid.selectWallet.fromSeed(fundWallet.seedPhrase);
 
-    const tx = await lucid.newTx()
-      .addSigner(fundWallet.address)
-      .mintAssets({ [unit]: 1n }, redeemer)
-      .pay.ToAddressWithData(receiverAddress,
-        { kind: "inline", value: metadataCBOR },
-        { [unit]: 1n })
-      // .validTo(date.getTime())
-      .attach.MintingPolicy(mintingPolicy)
-      .complete();
+    const userTokenQuantity = receiverAddresses.length;
 
-    const signedTx = await tx.sign.withPrivateKey(fundWallet.paymentKey).complete();
+    let tx = lucid.newTx()
+      .addSigner(fundWallet.address)
+      .mintAssets(
+        {
+          [refUnit]: 1n,
+          [userUnit]: BigInt(userTokenQuantity),
+        },
+        redeemer
+      )
+      .attach.MintingPolicy(mintingPolicy)
+      // .validTo(date.getTime())
+      .pay.ToContract(
+        validatorAddress,
+        { kind: "inline", value: datum },
+        { [refUnit]: 1n }
+      );
+
+    for (const address of receiverAddresses) {
+      tx = tx.pay.ToAddress(
+        address,
+        { [userUnit]: 1n }
+      )
+    }
+    const txToSign = await tx.complete();
+
+    const signedTx = await txToSign.sign.withPrivateKey(fundWallet.paymentKey).complete();
     const txHash = await signedTx.submit();
     console.log(`User NFT Certificate minted with tx hash: ${txHash}`);
     return txHash;
@@ -117,32 +136,18 @@ export class SU {
     return validatorBlueprint.validators.find((v) => (v.title).endsWith('.mint'))!.compiledCode;
   }
 
-  private static generateMetadata(): string {
-    const CIP68DatumSchema = Data.Object({
-      metadata: Data.Map(Data.Any(), Data.Any()),
-      version: Data.Integer(),
-    });
-    type CIP68DatumSchemaType = Data.Static<typeof CIP68DatumSchema>;
-    const CIP68Datum = CIP68DatumSchema as unknown as CIP68DatumSchemaType;
+  private static generateCIP68Metadata(): string {
+    const name = SU.getEnvVar("USER_NFT_CERTIFICATE_NAME");
+    const description = SU.getEnvVar("USER_NFT_CERTIFICATE_DESCRIPTION");
+    const image = SU.getEnvVar("USER_NFT_CERTIFICATE_IMAGE");
+    const expiration = SU.getEnvVar("USER_NFT_CERTIFICATE_EXPIRATION");
 
-    const metadataMap = new Map();
-    // TODO take next id from the database
-    // id: 1,
-    metadataMap.set(fromText("name"), Data.to(fromText(SU.getEnvVar("USER_NFT_CERTIFICATE_NAME"))));
-    metadataMap.set(fromText("description"), Data.to(fromText(SU.getEnvVar("USER_NFT_CERTIFICATE_DESCRIPTION"))));
-    metadataMap.set(fromText("image"), Data.to(fromText(SU.getEnvVar("USER_NFT_CERTIFICATE_IMAGE"))));
-    // ? Should this be converted to a number?
-    metadataMap.set(fromText("expiration"), Data.to(fromText(SU.getEnvVar("USER_NFT_CERTIFICATE_EXPIRATION"))));
-    // TODO get entity name and address from the database
-    // entity: {
-    //   name: "Salami Inc.",
-    //   address: "Via della Salamella 1, 12345 Salami City, Italy"
-    // }
-    const metadataCBOR = Data.to(
-      { metadata: metadataMap, version: 0n },
-      CIP68Datum
-    );
+    const metadata = Data.fromJson({ name, description, image });
+    const version = BigInt(1);
+    const extra: Data[] = [Data.fromJson({ expiration })];
+    const cip68 = new Constr(0, [metadata, version, extra]);
 
-    return metadataCBOR;
+    const datum = Data.to(cip68);
+    return datum;
   }
 }

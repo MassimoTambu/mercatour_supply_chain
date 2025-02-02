@@ -7,7 +7,7 @@ export function initializeDatabase(db: Database): void {
   // * They would not be stored in a real-world application.
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (payment_address TEXT PRIMARY KEY, seed_phrase TEXT, signing_key TEXT, verification_key TEXT);
-    CREATE TABLE IF NOT EXISTS user_certificates (transaction_hash TEXT PRIMARY KEY, user_payment_address TEXT, expiration TEXT, FOREIGN KEY(user_payment_address) REFERENCES users(payment_address));
+    CREATE TABLE IF NOT EXISTS user_certificates (transaction_hash TEXT, user_payment_address TEXT, expiration TEXT, PRIMARY KEY (transaction_hash, user_payment_address), FOREIGN KEY(user_payment_address) REFERENCES users(payment_address));
     CREATE TABLE IF NOT EXISTS products (product_id TEXT PRIMARY KEY, name TEXT, description TEXT);
     CREATE TABLE IF NOT EXISTS transactions (
       transaction_hash TEXT PRIMARY KEY, 

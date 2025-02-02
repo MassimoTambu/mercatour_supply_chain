@@ -57,11 +57,13 @@ export class SupplyChainRunner {
     return wallet;
   }
 
-  async createUserNFTCertificate(receiverAddress: Address): Promise<void> {
+  async createUserNFTCertificates(receiverAddresses: Address[]): Promise<void> {
     this.openDatabase();
-    const txHash = await SU.createUserNFTCertificate(this.lucid, receiverAddress);
+    const txHash = await SU.createUserNFTCertificates(this.lucid, receiverAddresses);
     const expiration = SU.getEnvVar("USER_NFT_CERTIFICATE_EXPIRATION");
-    insertUserNFTCertificate(this.db, txHash, receiverAddress, expiration);
+    for (const address of receiverAddresses) {
+      insertUserNFTCertificate(this.db, txHash, address, expiration);
+    }
     this.closeDatabase();
   }
 }
