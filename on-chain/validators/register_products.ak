@@ -28,7 +28,6 @@ validator register_products {
       get_mint_asset(self, policy_id)
         |> output_asset_must_contains_mint_asset(self, policy_id, _)
 
-    trace @"sign"
     expect_signature(redeemer)
 
     // Sender is the receiver as well

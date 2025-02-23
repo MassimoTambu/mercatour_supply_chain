@@ -35,13 +35,6 @@ test mint() {
   register_products.register_products.mint(redeemer, policy_id, tx)
 }
 
-test mint_twice() {
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
-  let tx = test_utils.create_transaction(vkh, [asset])
-
-  register_products.register_products.mint(redeemer, policy_id, tx)
-}
-
 test mint_with_other_assets_in_output() {
   let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
   let assets =
