@@ -2,11 +2,16 @@ import { SupplyChainWallet } from './interfaces/supply_chain_wallet.ts';
 import { LucidEvolution, walletFromSeed } from '@lucid-evolution/lucid';
 import { fromText } from '@lucid-evolution/core-utils';
 import { Constr, Data } from '@lucid-evolution/plutus';
-import { Address, AddressDetails, MintingPolicy, SpendingValidator } from "@lucid-evolution/core-types";
+import { Address, Assets, AddressDetails, MintingPolicy, SpendingValidator } from "@lucid-evolution/core-types";
 import { applyDoubleCborEncoding, applyParamsToScript, generateSeedPhrase, getAddressDetails, mintingPolicyToId, toPublicKey, toUnit, validatorToAddress } from "@lucid-evolution/utils";
 import { PlutusJson } from "./interfaces/plutus_json.ts";
+import * as Cardano from "@emurgo/cardano-serialization-lib-nodejs";
+import plutusJson from "../../../on-chain/plutus.json" with { type: "json" };
+import { Buffer } from "node:buffer";
 
 export class SU {
+  static assetName: string = "MER_TOKEN"
+
   static getEnvVar(name: string): string {
     const envVar = Deno.env.get(name);
     if (envVar === undefined) {
@@ -72,12 +77,15 @@ export class SU {
   //   // console.log(`User NFT Certificate minted with tx hash: ${txHash}`);
   // }
 
-  // * In this new implementation, the policyId is generated in the code itself
-  // * and the validator blueprint is read from the plutus.json file.
+  /**
+   * This is a method not used anymore in the supply chain concept
+   * In this new implementation, the policyId is generated in the code itself
+   * and the validator blueprint is read from the plutus.json file.
+  */
   static async createUserNFTCertificates(lucid: LucidEvolution, receiverAddresses: Address[]): Promise<string> {
     const fundWallet = SU.getFundWallet();
     const tokenName = SU.getEnvVar("USER_NFT_CERTIFICATE_TOKEN_NAME");
-    const mintCompiledCode = SU.getPlutusMintCompiledCode();
+    const mintCompiledCode = SU.getPlutusUserNFTMintCompiledCode();
     const script = applyParamsToScript(
       applyDoubleCborEncoding(mintCompiledCode),
       [[fundWallet.verificationKeyHash]]
@@ -110,6 +118,7 @@ export class SU {
         redeemer
       )
       .attach.MintingPolicy(mintingPolicy)
+      // .attach.SpendingValidator(spendingValidator)
       // .validTo(date.getTime())
       .pay.ToContract(
         validatorAddress,
@@ -131,9 +140,9 @@ export class SU {
     return txHash;
   }
 
-  private static getPlutusMintCompiledCode(): string {
+  private static getPlutusUserNFTMintCompiledCode(): string {
     const validatorBlueprint = JSON.parse(Deno.readTextFileSync('../../on-chain/plutus.json')) as PlutusJson;
-    return validatorBlueprint.validators.find((v) => (v.title).endsWith('.mint'))!.compiledCode;
+    return validatorBlueprint.validators.find((v) => v.title.endsWith('user_nfts.user_nfts.mint'))!.compiledCode;
   }
 
   private static generateCIP68Metadata(): string {
@@ -149,5 +158,78 @@ export class SU {
 
     const datum = Data.to(cip68);
     return datum;
+  }
+
+  static async registerProducts(lucid: LucidEvolution, wallets: SupplyChainWallet[]): Promise<string[]> {
+    const mintCompiledCode = SU.getRegisteredProductsMintCompiledCode();
+    const script = applyDoubleCborEncoding(mintCompiledCode);
+    const mintingPolicy: MintingPolicy = { type: "PlutusV3", script };
+    const policyId = mintingPolicyToId(mintingPolicy);
+    const assetName = fromText(this.assetName);
+    const userUnit = toUnit(policyId, assetName, 333); // label 333 is dedicated for FT
+    const userTokenQuantity = 12;
+    const txHashes: string[] = [];
+
+    for (const wallet of wallets) {
+      lucid.selectWallet.fromSeed(wallet.seedPhrase);
+      const message = Buffer.from(crypto.randomUUID()).toString('hex');
+      const signature = this.createSignature(wallet, message);
+      const publicKeyHex = Cardano.PublicKey.from_bech32(wallet.verificationKey).to_hex();
+      const redeemer = Data.to(
+        new Constr(0, [
+          publicKeyHex,
+          fromText(message),
+          signature,
+        ])
+      );
+
+      const tx = lucid.newTx()
+        .mintAssets(
+          {
+            [userUnit]: BigInt(userTokenQuantity),
+          },
+          redeemer,
+        )
+        .attach.MintingPolicy(mintingPolicy)
+        .pay.ToAddress(
+          wallet.address,
+          { [userUnit]: BigInt(userTokenQuantity) },
+        );
+
+      const txToSign = await tx.complete();
+      const signedTx = await txToSign.sign.withWallet().complete();
+      const txHash = await signedTx.submit();
+      console.log(`Product registered with tx hash: ${txHash}`);
+      txHashes.push(txHash);
+    }
+
+    return txHashes;
+  }
+
+  private static createSignature(address: SupplyChainWallet, message: string): string {
+    const privateKey = Cardano.PrivateKey.from_bech32(address.paymentKey);
+    const messageBytes = new TextEncoder().encode(message);
+    const signedMessage = privateKey.sign(messageBytes);
+    const signature = Buffer.from(signedMessage.to_bytes()).toString("hex");
+    return signature;
+  }
+
+  static async sendPayment(lucid: LucidEvolution, address: Address, lovelace: bigint): Promise<string> {
+    const fundWallet = SU.getFundWallet();
+    lucid.selectWallet.fromSeed(fundWallet.seedPhrase);
+
+    const assets: Assets = { lovelace };
+    const tx = await lucid.newTx()
+      .pay.ToAddress(address, assets)
+      .complete();
+
+    const signedTx = await tx.sign.withPrivateKey(fundWallet.paymentKey).complete();
+    const txHash = await signedTx.submit();
+    console.log(`Payment submitted with tx hash: ${txHash}`);
+    return txHash;
+  }
+
+  private static getRegisteredProductsMintCompiledCode(): string {
+    return (plutusJson as PlutusJson).validators.find((v) => v.title.endsWith('register_products.register_products.mint'))!.compiledCode;
   }
 }

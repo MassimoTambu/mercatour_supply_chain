@@ -1,10 +1,9 @@
-import { initializeDatabase, insertUserNFTCertificate, insertWallet } from "./queries.ts";
+import { initializeDatabase, insertWallet } from "./queries.ts";
 import { SU } from "./simulator_utils.ts";
 import { Lucid, LucidEvolution } from "@lucid-evolution/lucid";
 import { Blockfrost } from "@lucid-evolution/provider";
 import * as sqlite3 from 'sqlite3';
 import { SupplyChainWallet } from "./interfaces/supply_chain_wallet.ts";
-import { Address } from "@lucid-evolution/core-types";
 
 export class SupplyChainRunner {
   private lucid: LucidEvolution = null!;
@@ -57,13 +56,22 @@ export class SupplyChainRunner {
     return wallet;
   }
 
-  async createUserNFTCertificates(receiverAddresses: Address[]): Promise<void> {
-    this.openDatabase();
-    const txHash = await SU.createUserNFTCertificates(this.lucid, receiverAddresses);
-    const expiration = SU.getEnvVar("USER_NFT_CERTIFICATE_EXPIRATION");
-    for (const address of receiverAddresses) {
-      insertUserNFTCertificate(this.db, txHash, address, expiration);
-    }
-    this.closeDatabase();
+  /** This is a method not used anymore in the supply chain concept */
+  // async createUserNFTCertificates(receiverAddresses: Address[]): Promise<void> {
+  //   this.openDatabase();
+  //   const txHash = await SU.createUserNFTCertificates(this.lucid, receiverAddresses);
+  //   const expiration = SU.getEnvVar("USER_NFT_CERTIFICATE_EXPIRATION");
+  //   for (const address of receiverAddresses) {
+  //     insertUserNFTCertificate(this.db, txHash, address, expiration);
+  //   }
+  //   this.closeDatabase();
+  // }
+
+  async registerProducts(addresses: SupplyChainWallet[]) {
+    // this.openDatabase();
+    const txHashes = await SU.registerProducts(this.lucid, addresses);
+
+    // insertProducts(this.db, products);
+    // this.closeDatabase();
   }
 }

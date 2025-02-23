@@ -9,6 +9,7 @@
     "jsr:@std/fs@0.221": "0.221.0",
     "jsr:@std/path@0.217": "0.217.0",
     "jsr:@std/path@0.221": "0.221.0",
+    "npm:@emurgo/cardano-serialization-lib-nodejs@^14.1.1": "14.1.1",
     "npm:@lucid-evolution/core-types@~0.1.21": "0.1.21",
     "npm:@lucid-evolution/core-utils@~0.1.16": "0.1.16",
     "npm:@lucid-evolution/lucid@~0.4.20": "0.4.20_effect@3.12.7",
@@ -117,6 +118,9 @@
     },
     "@emurgo/cardano-message-signing-nodejs@1.1.0": {
       "integrity": "sha512-PQRc8K8wZshEdmQenNUzVtiI8oJNF/1uAnBhidee5C4o1l2mDLOW+ur46HWHIFKQ6x8mSJTllcjMscHgzju0gQ=="
+    },
+    "@emurgo/cardano-serialization-lib-nodejs@14.1.1": {
+      "integrity": "sha512-UpQzrDOolgssJHeaaMUS+ShDTNBHCnzgKd95G/2Hg9+l8i3zTJ7dlGQDEk/35LgLt8twCHWZDCytrpx7PY12ww=="
     },
     "@harmoniclabs/bigint-utils@1.0.0": {
       "integrity": "sha512-OhZMHcdtH2hHKMlxWFHf71PmKHdoi9ARpjS9mUu0/cd8VWDDjT7VQoQwC5NN/68iyO4O5Dojrvrp9tjG5BDABA==",
@@ -371,6 +375,7 @@
   },
   "workspace": {
     "dependencies": [
+      "npm:@emurgo/cardano-serialization-lib-nodejs@^14.1.1",
       "npm:@lucid-evolution/core-types@~0.1.21",
       "npm:@lucid-evolution/core-utils@~0.1.16",
       "npm:@lucid-evolution/lucid@~0.4.20",
