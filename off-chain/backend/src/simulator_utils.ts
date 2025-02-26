@@ -16,7 +16,7 @@ export class SU {
     name: "MER_TOKEN",
     description: "Token used to identify products in the Mercatour supply chain",
     image: "https://upload.wikimedia.org/wikipedia/commons/1/15/Red_Apple.jpg",
-    media_type: "image/jpeg",
+    mediaType: "image/jpeg",
     version: 2,
   };
 
