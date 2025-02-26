@@ -7,10 +7,18 @@ import { applyDoubleCborEncoding, applyParamsToScript, generateSeedPhrase, getAd
 import { PlutusJson } from "./interfaces/plutus_json.ts";
 import * as Cardano from "@emurgo/cardano-serialization-lib-nodejs";
 import plutusJson from "../../../on-chain/plutus.json" with { type: "json" };
+import productsJson from "../products.json" with { type: "json" };
 import { Buffer } from "node:buffer";
 
 export class SU {
   static assetName: string = "MER_TOKEN"
+  static assetStandardMetadata = {
+    name: "MER_TOKEN",
+    description: "Token used to identify products in the Mercatour supply chain",
+    image: "https://upload.wikimedia.org/wikipedia/commons/1/15/Red_Apple.jpg",
+    media_type: "image/jpeg",
+    version: 2,
+  };
 
   static getEnvVar(name: string): string {
     const envVar = Deno.env.get(name);
@@ -161,6 +169,8 @@ export class SU {
   }
 
   static async registerProducts(lucid: LucidEvolution, wallets: SupplyChainWallet[]): Promise<string[]> {
+    const pIndex = Math.floor(Math.random() * productsJson.length);
+    const productTransactionMetadata = productsJson[pIndex];
     const mintCompiledCode = SU.getRegisteredProductsMintCompiledCode();
     const script = applyDoubleCborEncoding(mintCompiledCode);
     const mintingPolicy: MintingPolicy = { type: "PlutusV3", script };
@@ -169,6 +179,12 @@ export class SU {
     const userUnit = toUnit(policyId, assetName, 333); // label 333 is dedicated for FT
     const userTokenQuantity = 12;
     const txHashes: string[] = [];
+
+    const assetMetadata = {
+      [policyId]: {
+        [assetName]: this.assetStandardMetadata,
+      }
+    }
 
     for (const wallet of wallets) {
       lucid.selectWallet.fromSeed(wallet.seedPhrase);
@@ -190,6 +206,8 @@ export class SU {
           },
           redeemer,
         )
+        .attachMetadata(4, productTransactionMetadata)
+        .attachMetadata(721, assetMetadata)
         .attach.MintingPolicy(mintingPolicy)
         .pay.ToAddress(
           wallet.address,

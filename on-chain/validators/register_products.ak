@@ -11,6 +11,7 @@ use types.{RegisterProductsRedeemer}
 pub const asset_name: ByteArray = #"0014df104d45525f544f4b454e"
 
 validator register_products {
+  // TODO burn in case of products sold but not transferred because the counterpart is not registered on the blockchain
   mint(
     redeemer: RegisterProductsRedeemer,
     policy_id: PolicyId,
