@@ -1,22 +1,21 @@
 use aiken/collection/dict
 use aiken/collection/list
-use aiken/crypto.{blake2b_224, verify_ed25519_signature}
-use cardano/address.{from_verification_key}
+use aiken/collection/pairs
 use cardano/assets.{AssetName, PolicyId}
-use cardano/transaction.{Output, Transaction}
-use types.{RegisterProductsRedeemer}
+use cardano/transaction.{InlineDatum, Output, Transaction}
+use types.{RegisterProductsDatum}
 
 // Look at CIP 67 for label definitions
-// label 333: 0014df10 | MER_TOKEN 4d45525f544f4b454e
-pub const asset_name: ByteArray = #"0014df104d45525f544f4b454e"
+// TODO UPDATE label
+// label 222: 000de140 | MER_TOKEN 4d45525f544f4b454e
+pub const nft_asset_name: ByteArray = #"000de1404d45525f544f4b454e"
+
+// TODO UPDATE
+// label 100: 000643b0 | MER_TOKEN 4d45525f544f4b454e
+pub const rnft_asset_name: ByteArray = #"000643b04d45525f544f4b454e"
 
 validator register_products {
-  // TODO burn in case of products sold but not transferred because the counterpart is not registered on the blockchain
-  mint(
-    redeemer: RegisterProductsRedeemer,
-    policy_id: PolicyId,
-    self: Transaction,
-  ) {
+  mint(_redeemer: Data, policy_id: PolicyId, self: Transaction) {
     // TODO Manage multiple operations, like:
     // - create more than one minting
     // - Concatenate register with transfer of ownership
@@ -25,20 +24,47 @@ validator register_products {
     // Check receiver is this validator address
     expect Some(input) = list.at(self.inputs, 0)
 
-    let output =
-      get_mint_asset(self, policy_id)
-        |> output_asset_must_contains_mint_asset(self, policy_id, _)
-
-    expect_signature(redeemer)
+    let (nft_amount, rnft_amount) = get_mint_assets_amounts(self, policy_id)
+    let nft_output =
+      find_asset_output_by_asset_name(
+        self,
+        policy_id,
+        nft_asset_name,
+        fn(asset_amount) {
+          and {
+            asset_amount > 0,
+            asset_amount == nft_amount,
+          }
+        },
+      )
 
     // Sender is the receiver as well
-    expect input.output.address == output.address
-    // Verify if redeemer's public key equals to sender's public key
-    let redeemer_address =
-      redeemer.verification_key |> blake2b_224() |> from_verification_key()
-    trace @"input.output.address": input.output.address
-    trace @"redeemer address": redeemer_address
-    input.output.address.payment_credential == redeemer_address.payment_credential
+    expect input.output.address == nft_output.address
+
+    let rnft_output =
+      find_asset_output_by_asset_name(
+        self,
+        policy_id,
+        rnft_asset_name,
+        fn(asset_amount) {
+          and {
+            asset_amount == 1,
+            asset_amount == rnft_amount,
+          }
+        },
+      )
+
+    expect InlineDatum(datum) = rnft_output.datum
+    expect datum: RegisterProductsDatum = datum
+    expect and {
+        datum.product_name != "",
+        datum.unit_of_measurement != "",
+      }
+
+    // Validator address must receive RNFT
+    // TODO expect rnft_output.address.payment_credential == self.script_address.payment_credential
+    trace @"validator passed"
+    True
   }
 
   else(_) {
@@ -46,64 +72,54 @@ validator register_products {
   }
 }
 
-pub fn expect_signature(redeemer: RegisterProductsRedeemer) -> Void {
-  trace @"redeemer": redeemer.verification_key, redeemer.message, redeemer.signature
-  expect
-    verify_ed25519_signature(
-      redeemer.verification_key,
-      redeemer.message,
-      redeemer.signature,
-    )
-}
-
-// Find a output where its value corresponds to the mint value
-pub fn get_mint_asset(
+// Find a list of assets in the tx mint that are going to be created by this same policy_id.
+// We expect to find the NFT and the RNFT.
+pub fn get_mint_assets_amounts(
   self: Transaction,
   policy_id: PolicyId,
-) -> (AssetName, Int) {
+) -> (Int, Int) {
   trace @"mint": self.mint
   trace @"policy_id": policy_id
-  expect [Pair(mint_asset_name, mint_amount)] =
+  let mint_assets =
     self.mint
       |> assets.tokens(policy_id)
       |> dict.to_pairs()
-  (mint_asset_name, mint_amount)
+
+  expect list.length(mint_assets) == 2
+  expect (Some(nft_amount), Some(rnft_amount)) =
+    (
+      pairs.get_first(mint_assets, nft_asset_name),
+      pairs.get_first(mint_assets, rnft_asset_name),
+    )
+
+  (nft_amount, rnft_amount)
 }
 
-// Find a output where:
-// - asset name is the same as the mint asset name and the one defined in the validator
-// - asset amount is the same as the mint amount
-// - asset amount is greater than 0
-pub fn output_asset_must_contains_mint_asset(
+pub fn find_asset_output_by_asset_name(
   self: Transaction,
   policy_id: PolicyId,
-  mint_asset: (AssetName, Int),
+  asset_name: AssetName,
+  asset_amount_check: fn(Int) -> Bool,
 ) -> Output {
   trace @"outputs": self.outputs
   trace @"asset_name": asset_name
-  trace @"mint_asset_name": mint_asset.1st
-  trace @"mint_amount": mint_asset.2nd
-  let outputs =
+  expect [output] =
     list.filter(
       self.outputs,
       fn(x) {
+        // Implicitly expect to find the asset with given name
         let option_asset_amount: Option<Int> =
           x.value |> assets.tokens(policy_id) |> dict.get(asset_name)
         trace @"option_asset_amount": if option_asset_amount == None {
           @"Found extraneous asset. SKIP"
         } else {
-          @"Found asset with correct policy_id and asset_name"
+          @"Found asset with correct policy_id and nft_asset_name"
         }
         when option_asset_amount is {
           None -> False
-          Some(asset_amount) -> and {
-              asset_name == mint_asset.1st,
-              asset_amount > 0,
-              asset_amount == mint_asset.2nd,
-            }
+          Some(asset_amount) -> asset_amount_check(asset_amount)
         }
       },
     )
-  expect [output] = outputs
   output
 }
