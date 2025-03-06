@@ -6,11 +6,9 @@ use cardano/transaction.{InlineDatum, Output, Transaction}
 use types.{RegisterProductsDatum}
 
 // Look at CIP 67 for label definitions
-// TODO UPDATE label
 // label 222: 000de140 | MER_TOKEN 4d45525f544f4b454e
 pub const nft_asset_name: ByteArray = #"000de1404d45525f544f4b454e"
 
-// TODO UPDATE
 // label 100: 000643b0 | MER_TOKEN 4d45525f544f4b454e
 pub const rnft_asset_name: ByteArray = #"000643b04d45525f544f4b454e"
 
