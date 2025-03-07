@@ -168,6 +168,8 @@ export class SU {
     return datum;
   }
 
+  // This is an old implementation when I started thinking to store the metadata in the
+  // tx metadata instead of the datum
   static async registerProducts(lucid: LucidEvolution, wallets: SupplyChainWallet[]): Promise<string[]> {
     const pIndex = Math.floor(Math.random() * productsJson.length);
     const productTransactionMetadata = productsJson[pIndex];

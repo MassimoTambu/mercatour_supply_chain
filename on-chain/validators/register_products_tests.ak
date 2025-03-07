@@ -1,14 +1,15 @@
 use aiken/collection/list
 use aiken/crypto.{VerificationKey, VerificationKeyHash, blake2b_224}
 use aiken/primitive/string
-use cardano/address
-use cardano/assets.{Value, from_lovelace}
+use cardano/address.{from_script}
+use cardano/assets.{PolicyId, Value, from_lovelace}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use register_products
 use test_kit/tx.{
   add_asset_to_tx_output, new_tx_input, new_tx_output, set_datum_of_tx_output,
   with_asset_of_tx_input,
 }
+use test_types.{TestAssetData}
 use types.{RegisterProductsDatum}
 
 // Private key F540ECC5FC9444EB08F14DC6A6E22401BB360D815072969B8C15052F7D5F5D32
@@ -17,9 +18,9 @@ const verification_key: VerificationKey =
 
 const vkh: ByteArray = blake2b_224(verification_key)
 
-const policy_id: ByteArray = #"6e6f5f6e616d655f746f6b656e"
+const policy_id: PolicyId = #"6e6f5f6e616d655f746f6b656e"
 
-const quantity: Int = 12
+const quantity: Int = 400
 
 const nft_asset: Value =
   assets.from_asset(policy_id, register_products.nft_asset_name, quantity)
@@ -40,7 +41,7 @@ const mint_value: Value = nft_asset |> assets.merge(rnft_asset)
 
 fn create_transaction(
   verification_key_hash: VerificationKeyHash,
-  assets_with_datum: List<(Value, Option<RegisterProductsDatum>)>,
+  asset_data_list: List<TestAssetData>,
   mint_value: Value,
 ) -> Transaction {
   let utxo_ref =
@@ -52,15 +53,27 @@ fn create_transaction(
 
   let outputs: List<Output> =
     list.map(
-      assets_with_datum,
-      fn(asset_with_datum) {
-        let output =
-          new_tx_output(dummy_addr)
-            |> add_asset_to_tx_output(asset_with_datum.1st)
+      asset_data_list,
+      fn(asset_data) {
+        if contain_value(asset_data.datum) && contain_value(
+          asset_data.policy_id,
+        ) {
+          expect Some(datum) = asset_data.datum
+          expect Some(policy_id) = asset_data.policy_id
+          new_tx_output(from_script(policy_id))
+            |> add_asset_to_tx_output(asset_data.value)
             |> add_asset_to_tx_output(assets.from_lovelace(2_000_000))
-        when asset_with_datum.2nd is {
-          Some(datum) -> set_datum_of_tx_output(output, InlineDatum(datum))
-          None -> output
+            |> set_datum_of_tx_output(InlineDatum(datum))
+        } else if contain_value(asset_data.datum) {
+          expect Some(datum) = asset_data.datum
+          new_tx_output(dummy_addr)
+            |> add_asset_to_tx_output(asset_data.value)
+            |> add_asset_to_tx_output(assets.from_lovelace(2_000_000))
+            |> set_datum_of_tx_output(InlineDatum(datum))
+        } else {
+          new_tx_output(dummy_addr)
+            |> add_asset_to_tx_output(asset_data.value)
+            |> add_asset_to_tx_output(assets.from_lovelace(2_000_000))
         }
       },
     )
@@ -78,11 +91,21 @@ fn create_transaction(
   }
 }
 
+fn contain_value(opt: Option<a>) -> Bool {
+  when opt is {
+    Some(_) -> True
+    None -> False
+  }
+}
+
 test mint() {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
@@ -97,8 +120,42 @@ test mint_with_other_assets_in_output() {
       99,
     )
   let assets =
-    [(nft_asset, None), (rnft_asset, Some(datum)), (other_asset, None)]
+    [
+      TestAssetData(nft_asset, None, None),
+      TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      TestAssetData(other_asset, None, None),
+    ]
   let tx = create_transaction(vkh, assets, mint_value)
+
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+// It will fail because of two rnft with the same amount.
+// We cannot mint more than one nft-rnft couple, because we then
+// don't know who belongs to what
+test mint_two_assets() fail {
+  let second_nft_asset =
+    assets.from_asset(policy_id, register_products.nft_asset_name, 1100)
+  let second_datum =
+    RegisterProductsDatum {
+      product_name: string.to_bytearray(@"melons"),
+      certificates: [],
+      harvest_date: 1741199651,
+      expiration_date: 1743870851,
+      unit_of_measurement: string.to_bytearray(@"grams"),
+    }
+
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+        TestAssetData(second_nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(second_datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
 
   register_products.register_products.mint(Void, policy_id, tx)
 }
@@ -107,7 +164,10 @@ test mint_different_policy_id() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
   expect _ =
@@ -128,7 +188,14 @@ test mint_different_token_policy_id() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(
+          rnft_asset,
+          Some(datum),
+          Some(#"123f5f6e616d655f746f6b656e"),
+        ),
+      ],
       mint_value,
     )
   register_products.register_products.mint(Void, policy_id, tx)
@@ -141,7 +208,10 @@ test mint_different_token_name() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
@@ -154,7 +224,10 @@ test mint_negative_token_value() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
@@ -167,7 +240,10 @@ test mint_zero_token_value() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
@@ -179,7 +255,10 @@ test mint_empty_datum_product_name() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
@@ -191,7 +270,10 @@ test mint_empty_datum_unit_of_measurement() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
@@ -208,7 +290,10 @@ test get_mint_asset_with_wrong_policy_id() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
@@ -217,23 +302,30 @@ test get_mint_asset_with_wrong_policy_id() fail {
 
 test get_mint_asset_with_different_asset_name() fail {
   // label (222): 000de140 | YOLO_TOKEN: 594f4c4f5f544f4b454e
-  let asset_name = #"000de140594f4c4f5f544f4b454e"
-  let nft_asset: Value = assets.from_asset(policy_id, asset_name, quantity)
+  let nft_asset_name = #"000de140594f4c4f5f544f4b454e"
+  let nft_asset: Value = assets.from_asset(policy_id, nft_asset_name, quantity)
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
-  let (nft_amount, rnft_amount) =
-    register_products.get_mint_assets_amounts(tx, policy_id)
+  let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.output_assets_must_contains_mint_assets(
+    register_products.find_asset_output_by_asset_name(
       tx,
       policy_id,
-      nft_amount,
-      rnft_amount,
+      register_products.nft_asset_name,
+      fn(asset_amount) {
+        and {
+          asset_amount > 0,
+          asset_amount == nft_amount,
+        }
+      },
     )
 }
 
@@ -243,18 +335,25 @@ test output_asset_must_contains_mint_asset_with_negative_token_value() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
-  let (nft_amount, rnft_amount) =
-    register_products.get_mint_assets_amounts(tx, policy_id)
+  let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.output_assets_must_contains_mint_assets(
+    register_products.find_asset_output_by_asset_name(
       tx,
       policy_id,
-      nft_amount,
-      rnft_amount,
+      register_products.nft_asset_name,
+      fn(asset_amount) {
+        and {
+          asset_amount > 0,
+          asset_amount == nft_amount,
+        }
+      },
     )
 }
 
@@ -264,17 +363,24 @@ test output_asset_must_contains_mint_asset_zero_token_value() fail {
   let tx =
     create_transaction(
       vkh,
-      [(nft_asset, None), (rnft_asset, Some(datum))],
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
       mint_value,
     )
 
-  let (nft_amount, rnft_amount) =
-    register_products.get_mint_assets_amounts(tx, policy_id)
+  let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.output_assets_must_contains_mint_assets(
+    register_products.find_asset_output_by_asset_name(
       tx,
       policy_id,
-      nft_amount,
-      rnft_amount,
+      register_products.nft_asset_name,
+      fn(asset_amount) {
+        and {
+          asset_amount > 0,
+          asset_amount == nft_amount,
+        }
+      },
     )
 }

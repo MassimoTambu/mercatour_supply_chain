@@ -4,7 +4,7 @@ use aiken/crypto.{blake2b_224, verify_ed25519_signature}
 use cardano/address.{from_verification_key}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{Output, Transaction}
-use types.{RegisterProductsRedeemer}
+use old/custom_types.{RegisterProductsRedeemer}
 
 // Look at CIP 67 for label definitions
 // label 333: 0014df10 | MER_TOKEN 4d45525f544f4b454e
