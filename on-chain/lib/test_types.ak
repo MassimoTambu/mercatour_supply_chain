@@ -1,8 +1,8 @@
 use cardano/assets.{PolicyId, Value}
-use types.{RegisterProductsDatum}
+use types.{CIP68Datum}
 
 pub type TestAssetData {
   value: Value,
-  datum: Option<RegisterProductsDatum>,
+  datum: Option<CIP68Datum>,
   policy_id: Option<PolicyId>,
 }

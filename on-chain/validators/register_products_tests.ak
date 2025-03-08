@@ -1,4 +1,5 @@
 use aiken/collection/list
+use aiken/collection/pairs
 use aiken/crypto.{VerificationKey, VerificationKeyHash, blake2b_224}
 use aiken/primitive/string
 use cardano/address.{from_script}
@@ -10,7 +11,7 @@ use test_kit/tx.{
   with_asset_of_tx_input,
 }
 use test_types.{TestAssetData}
-use types.{RegisterProductsDatum}
+use types.{CIP68Datum}
 
 // Private key F540ECC5FC9444EB08F14DC6A6E22401BB360D815072969B8C15052F7D5F5D32
 const verification_key: VerificationKey =
@@ -25,19 +26,49 @@ const quantity: Int = 400
 const nft_asset: Value =
   assets.from_asset(policy_id, register_products.nft_asset_name, quantity)
 
-const datum =
-  RegisterProductsDatum {
-    product_name: string.to_bytearray(@"tomatoes"),
-    certificates: [string.to_bytearray(@"organic")],
-    harvest_date: 1741199651,
-    expiration_date: 1743870851,
-    unit_of_measurement: string.to_bytearray(@"grams"),
-  }
+const metadata: Pairs<Data, Data> =
+  [
+    Pair(
+      cast_to_data(string.to_bytearray(@"name")),
+      cast_to_data(string.to_bytearray(@"tomatoes")),
+    ),
+    Pair(
+      cast_to_data(string.to_bytearray(@"description")),
+      cast_to_data(string.to_bytearray(@"")),
+    ),
+    Pair(
+      cast_to_data(string.to_bytearray(@"image")),
+      cast_to_data(string.to_bytearray(@"")),
+    ),
+    Pair(
+      cast_to_data(string.to_bytearray(@"certificates")),
+      cast_to_data([string.to_bytearray(@"organic")]),
+    ),
+    Pair(
+      cast_to_data(string.to_bytearray(@"harvest_date")),
+      cast_to_data(1741199651),
+    ),
+    Pair(
+      cast_to_data(string.to_bytearray(@"expiration_date")),
+      cast_to_data(1743870851),
+    ),
+    Pair(
+      cast_to_data(string.to_bytearray(@"measurement")),
+      cast_to_data(string.to_bytearray(@"grams")),
+    ),
+  ]
+
+const datum = CIP68Datum { metadata, version: 1 }
 
 const rnft_asset: Value =
   assets.from_asset(policy_id, register_products.rnft_asset_name, 1)
 
 const mint_value: Value = nft_asset |> assets.merge(rnft_asset)
+
+fn cast_to_data(value: Data) -> Data {
+  let data_value: Data = value
+  data_value
+}
 
 fn create_transaction(
   verification_key_hash: VerificationKeyHash,
@@ -137,12 +168,15 @@ test mint_two_assets() fail {
   let second_nft_asset =
     assets.from_asset(policy_id, register_products.nft_asset_name, 1100)
   let second_datum =
-    RegisterProductsDatum {
-      product_name: string.to_bytearray(@"melons"),
-      certificates: [],
-      harvest_date: 1741199651,
-      expiration_date: 1743870851,
-      unit_of_measurement: string.to_bytearray(@"grams"),
+    CIP68Datum {
+      metadata: list.push(
+        pairs.delete_first(metadata, string.to_bytearray(@"name")),
+        Pair(
+          cast_to_data(string.to_bytearray(@"name")),
+          cast_to_data(string.to_bytearray(@"Melons")),
+        ),
+      ),
+      version: 1,
     }
 
   let tx =
@@ -251,7 +285,17 @@ test mint_zero_token_value() fail {
 }
 
 test mint_empty_datum_product_name() fail {
-  let datum = RegisterProductsDatum { ..datum, product_name: "" }
+  let datum =
+    CIP68Datum {
+      metadata: list.push(
+        pairs.delete_first(metadata, string.to_bytearray(@"name")),
+        Pair(
+          cast_to_data(string.to_bytearray(@"name")),
+          cast_to_data(string.to_bytearray(@"")),
+        ),
+      ),
+      version: 1,
+    }
   let tx =
     create_transaction(
       vkh,
@@ -265,8 +309,18 @@ test mint_empty_datum_product_name() fail {
   register_products.register_products.mint(Void, policy_id, tx)
 }
 
-test mint_empty_datum_unit_of_measurement() fail {
-  let datum = RegisterProductsDatum { ..datum, unit_of_measurement: "" }
+test mint_empty_datum_measurement() fail {
+  let datum =
+    CIP68Datum {
+      metadata: list.push(
+        pairs.delete_first(metadata, string.to_bytearray(@"measurement")),
+        Pair(
+          cast_to_data(string.to_bytearray(@"measurement")),
+          cast_to_data(string.to_bytearray(@"")),
+        ),
+      ),
+      version: 1,
+    }
   let tx =
     create_transaction(
       vkh,
@@ -383,4 +437,56 @@ test output_asset_must_contains_mint_asset_zero_token_value() fail {
         }
       },
     )
+}
+
+test check_metadata_different_field() {
+  and {
+    // missing one field
+    register_products.check_metadata(
+      pairs.delete_first(metadata, string.to_bytearray(@"certificates")),
+    ) == False,
+    // One field of too much
+    register_products.check_metadata(
+      list.push(
+        metadata,
+        Pair(
+          cast_to_data(string.to_bytearray(@"foo")),
+          cast_to_data(string.to_bytearray(@"bar")),
+        ),
+      ),
+    ) == False,
+    // One field replaced by another one
+    register_products.check_metadata(
+      list.push(
+        pairs.delete_first(metadata, string.to_bytearray(@"certificates")),
+        Pair(
+          cast_to_data(string.to_bytearray(@"foo")),
+          cast_to_data(string.to_bytearray(@"bar")),
+        ),
+      ),
+    ) == False,
+    // One field removed, two fields repeated
+    register_products.check_metadata(
+      list.push(
+        pairs.delete_first(metadata, string.to_bytearray(@"certificates")),
+        Pair(
+          cast_to_data(string.to_bytearray(@"description")),
+          cast_to_data(string.to_bytearray(@"bar")),
+        ),
+      ),
+    ) == False,
+  }
+}
+
+test check_metadata_wrong_type() fail {
+  let metadata =
+    list.push(
+      pairs.delete_first(metadata, string.to_bytearray(@"harvest_date")),
+      Pair(
+        cast_to_data(string.to_bytearray(@"harvest_date")),
+        cast_to_data(string.to_bytearray(@"string value!")),
+      ),
+    )
+
+  expect _ = register_products.check_metadata(metadata)
 }

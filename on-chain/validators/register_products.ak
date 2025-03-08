@@ -4,7 +4,7 @@ use aiken/collection/pairs
 use cardano/address.{from_script}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{InlineDatum, Output, Transaction}
-use types.{RegisterProductsDatum}
+use types.{CIP68Datum}
 
 // Look at CIP 67 for label definitions
 // label 222: 000de140 | MER_TOKEN 4d45525f544f4b454e
@@ -57,20 +57,16 @@ validator register_products {
         },
       )
 
+    trace @"Check datum"
     expect InlineDatum(datum) = rnft_output.datum
-    expect datum: RegisterProductsDatum = datum
-    trace @"Found correct datum type"
-    expect and {
-        datum.product_name != "",
-        datum.unit_of_measurement != "",
-      }
+    expect datum: CIP68Datum = datum
+    expect check_metadata(datum.metadata)
 
     trace if from_script(policy_id).payment_credential == rnft_output.address.payment_credential {
       @"Validation Success"
     } else {
       @"Rnft receiver does not correspond to the validator address"
     }
-
     // Validator address must receive RNFT
     from_script(policy_id).payment_credential == rnft_output.address.payment_credential
   }
@@ -137,4 +133,53 @@ pub fn find_asset_output_by_asset_name(
       },
     )
   output
+}
+
+// TODO change by using a prepopulated list of correct metadata and remove them when you find them in the metadata object
+// The scope is to prevent duplicate metadata
+pub fn check_metadata(metadata: Pairs<Data, Data>) -> Bool {
+  trace @"Check metadata"
+  if list.length(pairs.keys(metadata)) != 7 {
+    trace @"The number of metadata keys present in the datum is not valid"
+    False
+  } else {
+    let result =
+      pairs.map(
+        metadata,
+        fn(k, v) {
+          expect key: ByteArray = k
+          when key is {
+            // name
+            #"6e616d65" -> {
+              expect value: ByteArray = v
+              value != ""
+            }
+            // description
+            #"6465736372697074696f6e" -> True
+            // image
+            #"696d616765" -> True
+            // certificates
+            #"636572746966696361746573" -> True
+            // harvest_date
+            #"686172766573745f64617465" -> {
+              expect value: Int = v
+              value > 0
+            }
+            // expiration_date
+            #"65787069726174696f6e5f64617465" -> {
+              expect value: Int = v
+              value > 0
+            }
+            // measurement
+            #"6d6561737572656d656e74" -> {
+              expect value: ByteArray = v
+              value != ""
+            }
+            _ -> False
+          }
+        },
+      )
+    trace @"Check metadata False results": pairs.find_all(result, False)
+    pairs.find_first(result, False) == None
+  }
 }
