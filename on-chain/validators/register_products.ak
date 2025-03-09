@@ -19,6 +19,7 @@ validator register_products {
     // TODO Manage multiple operations, like:
     // - create more than one minting
     // - Concatenate register with transfer of ownership
+    // TODO what to do in case of huge inputs? ("went over budget" err)
     trace @"inputs": self.inputs
     expect list.length(self.inputs) == 1
     // Check receiver is this validator address
