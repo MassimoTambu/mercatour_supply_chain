@@ -5,6 +5,7 @@ use cardano/address.{from_script}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{InlineDatum, Output, Transaction}
 use types.{CIP68Datum}
+use utils
 
 // Look at CIP 67 for label definitions
 // label 222: 000de140 | MER_TOKEN 4d45525f544f4b454e
@@ -24,9 +25,9 @@ validator register_products {
     expect Some(input) = list.at(self.inputs, 0)
 
     let (nft_amount, rnft_amount) = get_mint_assets_amounts(self, policy_id)
-    trace @"Find nft outout"
+    trace @"Find nft output"
     let nft_output =
-      find_asset_output_by_asset_name(
+      utils.find_asset_output_by_asset_name(
         self,
         policy_id,
         nft_asset_name,
@@ -45,7 +46,7 @@ validator register_products {
 
     trace @"Find rnft outout"
     let rnft_output =
-      find_asset_output_by_asset_name(
+      utils.find_asset_output_by_asset_name(
         self,
         policy_id,
         rnft_asset_name,
@@ -60,7 +61,9 @@ validator register_products {
     trace @"Check datum"
     expect InlineDatum(datum) = rnft_output.datum
     expect datum: CIP68Datum = datum
-    expect check_metadata(datum.metadata)
+
+    expect utils.check_metadata(datum.metadata)
+    expect utils.check_extra_metadata(datum.extra)
 
     trace if from_script(policy_id).payment_credential == rnft_output.address.payment_credential {
       @"Validation Success"
@@ -97,89 +100,4 @@ pub fn get_mint_assets_amounts(
     )
 
   (nft_amount, rnft_amount)
-}
-
-pub fn find_asset_output_by_asset_name(
-  self: Transaction,
-  policy_id: PolicyId,
-  asset_name: AssetName,
-  check_asset_amount: fn(Int) -> Bool,
-) -> Output {
-  trace @"asset_name": asset_name
-  expect [output] =
-    list.filter(
-      self.outputs,
-      fn(x) {
-        // Implicitly expect to find the asset with given name
-        let option_asset_amount: Option<Int> =
-          x.value |> assets.tokens(policy_id) |> dict.get(asset_name)
-        trace @"option_asset_amount": if option_asset_amount == None {
-          @"Found extraneous asset. SKIP"
-        } else {
-          @"Found asset with correct policy_id and nft_asset_name"
-        }
-        when option_asset_amount is {
-          None -> False
-          Some(asset_amount) -> {
-            trace @"Check asset amount": when
-              check_asset_amount(asset_amount)
-            is {
-              True -> @"Passed"
-              _ -> @"Failed"
-            }
-            check_asset_amount(asset_amount)
-          }
-        }
-      },
-    )
-  output
-}
-
-// TODO change by using a prepopulated list of correct metadata and remove them when you find them in the metadata object
-// The scope is to prevent duplicate metadata
-pub fn check_metadata(metadata: Pairs<Data, Data>) -> Bool {
-  trace @"Check metadata"
-  if list.length(pairs.keys(metadata)) != 7 {
-    trace @"The number of metadata keys present in the datum is not valid"
-    False
-  } else {
-    let result =
-      pairs.map(
-        metadata,
-        fn(k, v) {
-          expect key: ByteArray = k
-          when key is {
-            // name
-            #"6e616d65" -> {
-              expect value: ByteArray = v
-              value != ""
-            }
-            // description
-            #"6465736372697074696f6e" -> True
-            // image
-            #"696d616765" -> True
-            // certificates
-            #"636572746966696361746573" -> True
-            // harvest_date
-            #"686172766573745f64617465" -> {
-              expect value: Int = v
-              value > 0
-            }
-            // expiration_date
-            #"65787069726174696f6e5f64617465" -> {
-              expect value: Int = v
-              value > 0
-            }
-            // measurement
-            #"6d6561737572656d656e74" -> {
-              expect value: ByteArray = v
-              value != ""
-            }
-            _ -> False
-          }
-        },
-      )
-    trace @"Check metadata False results": pairs.find_all(result, False)
-    pairs.find_first(result, False) == None
-  }
 }

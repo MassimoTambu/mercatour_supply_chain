@@ -101,14 +101,16 @@ export class SU {
 
   private static generateCIP68Metadata(productMetadata: ProductMetadata): string {
     const { name, description, certificates, harvest_date, expiration_date, image, measurement } = productMetadata;
-    const metadata = Data.fromJson({
-      name, description, image,
-      // Extra
-      certificates, harvest_date: Date.parse(harvest_date),
-      expiration_date: Date.parse(expiration_date), measurement
-    });
+    const metadata = Data.fromJson({ name, description, image });
     const version = BigInt(1);
-    const cip68 = new Constr(0, [metadata, version]);
+    const extra = new Constr(0, [
+      certificates.map(c => fromText(c)),
+      BigInt(Date.parse(harvest_date)),
+      BigInt(Date.parse(expiration_date)),
+      fromText(measurement),
+    ])
+
+    const cip68 = new Constr(0, [metadata, version, extra]);
 
     const datum = Data.to(cip68);
     return datum;

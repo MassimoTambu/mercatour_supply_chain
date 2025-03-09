@@ -11,7 +11,8 @@ use test_kit/tx.{
   with_asset_of_tx_input,
 }
 use test_types.{TestAssetData}
-use types.{CIP68Datum}
+use types.{CIP68Datum, ExtraDatum}
+use utils
 
 // Private key F540ECC5FC9444EB08F14DC6A6E22401BB360D815072969B8C15052F7D5F5D32
 const verification_key: VerificationKey =
@@ -40,25 +41,17 @@ const metadata: Pairs<Data, Data> =
       cast_to_data(string.to_bytearray(@"image")),
       cast_to_data(string.to_bytearray(@"")),
     ),
-    Pair(
-      cast_to_data(string.to_bytearray(@"certificates")),
-      cast_to_data([string.to_bytearray(@"organic")]),
-    ),
-    Pair(
-      cast_to_data(string.to_bytearray(@"harvest_date")),
-      cast_to_data(1741199651),
-    ),
-    Pair(
-      cast_to_data(string.to_bytearray(@"expiration_date")),
-      cast_to_data(1743870851),
-    ),
-    Pair(
-      cast_to_data(string.to_bytearray(@"measurement")),
-      cast_to_data(string.to_bytearray(@"grams")),
-    ),
   ]
 
-const datum = CIP68Datum { metadata, version: 1 }
+const extra_datum =
+  ExtraDatum {
+    certificates: [string.to_bytearray(@"organic")],
+    harvest_date: 1741199651,
+    expiration_date: 1743870851,
+    measurement: string.to_bytearray(@"grams"),
+  }
+
+const datum = CIP68Datum { metadata, version: 1, extra: extra_datum }
 
 const rnft_asset: Value =
   assets.from_asset(policy_id, register_products.rnft_asset_name, 1)
@@ -169,6 +162,7 @@ test mint_two_assets() fail {
     assets.from_asset(policy_id, register_products.nft_asset_name, 1100)
   let second_datum =
     CIP68Datum {
+      ..datum,
       metadata: list.push(
         pairs.delete_first(metadata, string.to_bytearray(@"name")),
         Pair(
@@ -176,7 +170,6 @@ test mint_two_assets() fail {
           cast_to_data(string.to_bytearray(@"Melons")),
         ),
       ),
-      version: 1,
     }
 
   let tx =
@@ -287,6 +280,7 @@ test mint_zero_token_value() fail {
 test mint_empty_datum_product_name() fail {
   let datum =
     CIP68Datum {
+      ..datum,
       metadata: list.push(
         pairs.delete_first(metadata, string.to_bytearray(@"name")),
         Pair(
@@ -294,7 +288,6 @@ test mint_empty_datum_product_name() fail {
           cast_to_data(string.to_bytearray(@"")),
         ),
       ),
-      version: 1,
     }
   let tx =
     create_transaction(
@@ -312,14 +305,8 @@ test mint_empty_datum_product_name() fail {
 test mint_empty_datum_measurement() fail {
   let datum =
     CIP68Datum {
-      metadata: list.push(
-        pairs.delete_first(metadata, string.to_bytearray(@"measurement")),
-        Pair(
-          cast_to_data(string.to_bytearray(@"measurement")),
-          cast_to_data(string.to_bytearray(@"")),
-        ),
-      ),
-      version: 1,
+      ..datum,
+      extra: ExtraDatum { ..extra_datum, measurement: string.to_bytearray(@"") },
     }
   let tx =
     create_transaction(
@@ -370,7 +357,7 @@ test get_mint_asset_with_different_asset_name() fail {
 
   let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.find_asset_output_by_asset_name(
+    utils.find_asset_output_by_asset_name(
       tx,
       policy_id,
       register_products.nft_asset_name,
@@ -398,7 +385,7 @@ test output_asset_must_contains_mint_asset_with_negative_token_value() fail {
 
   let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.find_asset_output_by_asset_name(
+    utils.find_asset_output_by_asset_name(
       tx,
       policy_id,
       register_products.nft_asset_name,
@@ -426,7 +413,7 @@ test output_asset_must_contains_mint_asset_zero_token_value() fail {
 
   let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.find_asset_output_by_asset_name(
+    utils.find_asset_output_by_asset_name(
       tx,
       policy_id,
       register_products.nft_asset_name,
@@ -442,11 +429,11 @@ test output_asset_must_contains_mint_asset_zero_token_value() fail {
 test check_metadata_different_field() {
   and {
     // missing one field
-    register_products.check_metadata(
-      pairs.delete_first(metadata, string.to_bytearray(@"certificates")),
+    utils.check_metadata(
+      pairs.delete_first(metadata, string.to_bytearray(@"description")),
     ) == False,
     // One field of too much
-    register_products.check_metadata(
+    utils.check_metadata(
       list.push(
         metadata,
         Pair(
@@ -455,38 +442,69 @@ test check_metadata_different_field() {
         ),
       ),
     ) == False,
-    // One field replaced by another one
-    register_products.check_metadata(
+  }
+}
+
+test check_metadata_one_field_replaced_by_another() fail {
+  expect _ =
+    utils.check_metadata(
       list.push(
-        pairs.delete_first(metadata, string.to_bytearray(@"certificates")),
+        pairs.delete_first(metadata, string.to_bytearray(@"description")),
         Pair(
           cast_to_data(string.to_bytearray(@"foo")),
           cast_to_data(string.to_bytearray(@"bar")),
         ),
       ),
-    ) == False,
-    // One field removed, two fields repeated
-    register_products.check_metadata(
-      list.push(
-        pairs.delete_first(metadata, string.to_bytearray(@"certificates")),
-        Pair(
-          cast_to_data(string.to_bytearray(@"description")),
-          cast_to_data(string.to_bytearray(@"bar")),
-        ),
+    )
+}
+
+test check_metadata_one_field_removed_two_fields_repeated() fail {
+  utils.check_metadata(
+    list.push(
+      pairs.delete_first(metadata, string.to_bytearray(@"image")),
+      Pair(
+        cast_to_data(string.to_bytearray(@"description")),
+        cast_to_data(string.to_bytearray(@"bar")),
       ),
-    ) == False,
-  }
+    ),
+  )
 }
 
 test check_metadata_wrong_type() fail {
   let metadata =
     list.push(
-      pairs.delete_first(metadata, string.to_bytearray(@"harvest_date")),
-      Pair(
-        cast_to_data(string.to_bytearray(@"harvest_date")),
-        cast_to_data(string.to_bytearray(@"string value!")),
-      ),
+      pairs.delete_first(metadata, string.to_bytearray(@"name")),
+      Pair(cast_to_data(string.to_bytearray(@"name")), cast_to_data(123)),
     )
 
-  expect _ = register_products.check_metadata(metadata)
+  expect _ = utils.check_metadata(metadata)
+}
+
+test check_extra_metadata_wrong_values() {
+  and {
+    utils.check_extra_metadata(
+      ExtraDatum {
+        certificates: [],
+        harvest_date: 0,
+        expiration_date: 123,
+        measurement: "grams",
+      },
+    ) == False,
+    utils.check_extra_metadata(
+      ExtraDatum {
+        certificates: [],
+        harvest_date: 123,
+        expiration_date: 0,
+        measurement: "grams",
+      },
+    ) == False,
+    utils.check_extra_metadata(
+      ExtraDatum {
+        certificates: [],
+        harvest_date: 123,
+        expiration_date: 123,
+        measurement: "",
+      },
+    ) == False,
+  }
 }

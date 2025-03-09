@@ -4,11 +4,14 @@ pub type CIP68Datum {
   //    name: ByteArray,
   //    description: ByteArray,
   //    image: ByteArray,
-  // Extras
-  //    certificates: List<ByteArray>,
-  //    harvest_date: Int,
-  //    expiration_date: Int,
-  //    measurement: ByteArray,
   metadata: Pairs<Data, Data>,
   version: Int,
+  extra: ExtraDatum,
+}
+
+pub type ExtraDatum {
+  certificates: List<ByteArray>,
+  harvest_date: Int,
+  expiration_date: Int,
+  measurement: ByteArray,
 }
