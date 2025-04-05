@@ -1,29 +1,45 @@
 # Mercatour Supply Chain
 
 ## Preamble
-
-This documentation focuses more in the technical details and interaction with the blockchain rather than the whole PoC idea (platform, users, subscriptions...).
+This documentation focuses on the technical aspects and blockchain interactions, rather than the overall PoC concept (platform, users, subscriptions, etc.).
 
 ## What is Mercatour?
+Mercatour is a web and mobile platform designed to provide visibility for individual resellers selling local food products at daily or weekly markets. Think of it as a "TripAdvisor" for local food resellers.
+Users can browse the platform to discover which resellers are present at each market, what products they are offering, and where those products were sourced or produced.
 
-Mercatour will be a web and mobile platform with the scope to give visibility to the individual resellers that sell local food products at the daily / weekly local markets. We can think about it like a TripAdvisor for local food resellers.
-Users can access the platform and see in every market who are the resellers, what they are selling and where the products have been gathered and produced.
+## The Supply Chain
+To offer greater transparency to users regarding the origins of the products, we are introducing an on-chain supply chain. This will allow us to track and link producers to resellers, providing customers with a transparent view of a product's journey.
 
-## The supply chain
-
-In order to let the users know where the products come from, we want to introduce an on-chain supply chain. In this way we are able to connect producers to resellers and give to the user a transparent overview and history of the product.
-
-Inside the existing platform, producers and resellers will have access to page where they can create, manage and transfer their products. Under the hoods it will be a very simplified blockchain wallet interface, where the products are the minted tokens from our validator. Token with a different policyId from ours and sent from wallets not part of our whitelist will be hidden (the whitelist is managed off-chain).
+Within the platform, both producers and resellers will have access to pages where they can create, manage, and transfer their products. Behind the scenes, this will function as a simplified blockchain wallet interface, where products are represented as minted tokens issued by our validator.
+Tokens that do not match our specific **policyId** or come from wallets not part of our whitelist will be hidden. The whitelist management will occur off-chain.
 
 ### Flow
 
-Let's say we have a producer, a reseller and an user. Here are the following actions:
-- **Register products**: the producer harvest the product and register what it gathered on-chain by minting new tokens from the validator. The details of the product are stored in the transaction metadata (product name, certificates, harvest and expiration date, unit of measurement) and the amount corresponds to the amount of tokens minted.
-- **Transfer of ownership**: when the producer sells the product to the reseller, it sends to its wallet a transaction containing the tokens (metadata are repeated also here for this transaction).
-- **Transform products**: the producer or reseller can combine products to make a new one (flour + eggs + ricotta cheese = pie) and inherits the history of all products. This and the transfer of ownership action can be done infinite times.
-- **Sell products to the consumer**: this action will burn the tokens, and it is used to terminate the supply chain of the product because it has been sold to the customer.
+Let’s consider a simple supply chain involving a producer, a reseller, and a consumer. The system supports the following key actions:
 
-The history of the products will be visible in the platform.
+- **Register Products**:
+The producer harvests the product and registers it on-chain by minting new tokens through a validator. Each token represents a unit of the product, and is sent to the producer’s wallet. The product's details — such as name, description, certifications, harvest and expiration dates, image, and unit of measurement — are stored in the UTxO’s datum alongside a Reference NFT.
+
+- **Transfer of Ownership**:
+When the producer sells the product to a reseller, ownership is transferred using standard blockchain transactions. No locking scripts are used here, allowing for a more flexible and lightweight transfer process.
+
+- **Transform Products**:
+The producer or reseller can combine multiple products to create a new one (e.g., flour + eggs + ricotta cheese = pie). The new product inherits the full history of its ingredients. This transformation, along with ownership transfers, can occur as many times as needed throughout the supply chain.
+
+- **Sell to Consumer**:
+Once the product reaches the end customer, the tokens are burned. This marks the product as consumed and finalizes its lifecycle on-chain.
+
+The complete product history — from creation to consumption — remains transparent and accessible on the platform, allowing users to trace the origins and transformations of any item.
+
+#### Why I decided this approach
+
+I've been carefully considering whether to use **locking scripts** — where the NFT is held at a script address to control its movement — or to rely solely on the **standard Cardano payment mechanism**. Each approach has its pros and cons:
+
+- If the goal is **only to track NFT ownership history**, and there are **no special rules to enforce**, then locking scripts aren't necessary. The blockchain already provides enough transparency for tracking transfers.
+However, using a **locking script** introduces **increased complexity and computation costs**, especially as more NFTs accumulate at the script address.
+- With locking scripts, I could enforce rules around **burning or transferring ownership** based on the product's state. But in this project, I want to **preserve user flexibility**.
+
+So instead of enforcing rules on-chain, I’ll let users **freely transfer ownership** — even directly to the final customer — but without the incentive of reclaiming the ADA tied to the token unless they burn it. In other words, **burning becomes their incentive to close the product lifecycle and retrieve their ADA**.
 
 ### Analysing the on-chain code
 

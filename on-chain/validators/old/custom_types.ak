@@ -1,3 +1,5 @@
+use aiken/crypto.{Signature, VerificationKey}
+
 pub type UserCertificateDatum {
   name: ByteArray,
   description: ByteArray,
@@ -14,4 +16,10 @@ pub type UserCertificateDatumV2 {
   // Verification Key
   owner: ByteArray,
   expiration: Int,
+}
+
+pub type RegisterProductsRedeemer {
+  verification_key: VerificationKey,
+  message: ByteArray,
+  signature: Signature,
 }

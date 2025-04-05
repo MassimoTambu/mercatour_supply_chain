@@ -1,9 +1,18 @@
-use aiken/crypto.{
-  Signature, VerificationKey, blake2b_224, verify_ed25519_signature,
-}
+use aiken/collection/list
+use aiken/collection/pairs
+use aiken/crypto.{VerificationKey, VerificationKeyHash, blake2b_224}
+use aiken/primitive/string
+use cardano/address.{from_script}
+use cardano/assets.{PolicyId, Value, from_lovelace}
+use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use register_products
-use test_utils
-use types.{RegisterProductsRedeemer}
+use test_kit/tx.{
+  add_asset_to_tx_output, new_tx_input, new_tx_output, set_datum_of_tx_output,
+  with_asset_of_tx_input,
+}
+use test_types.{TestAssetData}
+use types.{CIP68Datum, ExtraDatum}
+use utils
 
 // Private key F540ECC5FC9444EB08F14DC6A6E22401BB360D815072969B8C15052F7D5F5D32
 const verification_key: VerificationKey =
@@ -11,92 +20,305 @@ const verification_key: VerificationKey =
 
 const vkh: ByteArray = blake2b_224(verification_key)
 
-const asset_name: ByteArray = register_products.asset_name
+const policy_id: PolicyId = #"6e6f5f6e616d655f746f6b656e"
 
-const message: ByteArray = "test"
+const quantity: Int = 400
 
-const signature: Signature =
-  #"a09834afe64b328bb6a55740c295ae9b87628b71b9e2072bcbaab81f7b91d7237cf71e1c092207abceaa257f557a5b138bbdd1a1b89935429ec7c330a1164a0a"
+const nft_asset: Value =
+  assets.from_asset(policy_id, register_products.nft_asset_name, quantity)
 
-const policy_id: ByteArray = #"6e6f5f6e616d655f746f6b656e"
+const metadata: Pairs<Data, Data> =
+  [
+    Pair(
+      cast_to_data(string.to_bytearray(@"name")),
+      cast_to_data(string.to_bytearray(@"tomatoes")),
+    ),
+    Pair(
+      cast_to_data(string.to_bytearray(@"description")),
+      cast_to_data(string.to_bytearray(@"")),
+    ),
+    Pair(
+      cast_to_data(string.to_bytearray(@"image")),
+      cast_to_data(string.to_bytearray(@"")),
+    ),
+  ]
 
-const quantity: Int = 12
+const extra_datum =
+  ExtraDatum {
+    certificates: [string.to_bytearray(@"organic")],
+    harvest_date: 1741199651,
+    expiration_date: 1743870851,
+    measurement: string.to_bytearray(@"grams"),
+  }
 
-const asset = (policy_id, asset_name, quantity)
+const datum = CIP68Datum { metadata, version: 1, extra: extra_datum }
 
-test valid_signature() {
-  verify_ed25519_signature(verification_key, message, signature)
+const rnft_asset: Value =
+  assets.from_asset(policy_id, register_products.rnft_asset_name, 1)
+
+const mint_value: Value = nft_asset |> assets.merge(rnft_asset)
+
+fn cast_to_data(value: Data) -> Data {
+  let data_value: Data = value
+  data_value
 }
 
-test mint() {
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
-  let tx = test_utils.create_transaction(vkh, [asset])
+fn create_transaction(
+  verification_key_hash: VerificationKeyHash,
+  asset_data_list: List<TestAssetData>,
+  mint_value: Value,
+) -> Transaction {
+  let utxo_ref =
+    OutputReference(
+      #"0000000000000000000000000000000000000000000000000000000000000000",
+      0,
+    )
+  let dummy_addr = address.from_verification_key(verification_key_hash)
 
-  register_products.register_products.mint(redeemer, policy_id, tx)
-}
+  let outputs: List<Output> =
+    list.map(
+      asset_data_list,
+      fn(asset_data) {
+        if contain_value(asset_data.datum) && contain_value(
+          asset_data.policy_id,
+        ) {
+          expect Some(datum) = asset_data.datum
+          expect Some(policy_id) = asset_data.policy_id
+          new_tx_output(from_script(policy_id))
+            |> add_asset_to_tx_output(asset_data.value)
+            |> add_asset_to_tx_output(assets.from_lovelace(2_000_000))
+            |> set_datum_of_tx_output(InlineDatum(datum))
+        } else if contain_value(asset_data.datum) {
+          expect Some(datum) = asset_data.datum
+          new_tx_output(dummy_addr)
+            |> add_asset_to_tx_output(asset_data.value)
+            |> add_asset_to_tx_output(assets.from_lovelace(2_000_000))
+            |> set_datum_of_tx_output(InlineDatum(datum))
+        } else {
+          new_tx_output(dummy_addr)
+            |> add_asset_to_tx_output(asset_data.value)
+            |> add_asset_to_tx_output(assets.from_lovelace(2_000_000))
+        }
+      },
+    )
 
-test mint_with_other_assets_in_output() {
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
-  let assets =
-    [asset, (#"123f5f6e616d655f746f6b656e", #"0014df104d45525f544f4b454e", 99)]
-  let tx = test_utils.create_transaction(vkh, assets)
+  let input =
+    new_tx_input(utxo_ref, dummy_addr)
+      |> with_asset_of_tx_input(from_lovelace(2_000_000))
 
-  register_products.register_products.mint(redeemer, policy_id, tx)
-}
-
-test mint_different_policy_id() fail {
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
-  let tx = test_utils.create_transaction(vkh, [asset])
-
-  register_products.register_products.mint(
-    redeemer,
-    #"123f5f6e616d655f746f6b656e",
-    tx,
-  )
-}
-
-test mint_different_token_name() fail {
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
-  // label (333): 0014df10 | YOLO_TOKEN: 594f4c4f5f544f4b454e
-  let asset_name = #"0014df10594f4c4f5f544f4b454e"
-  let tx =
-    test_utils.create_transaction(vkh, [(policy_id, asset_name, quantity)])
-
-  register_products.register_products.mint(redeemer, policy_id, tx)
-}
-
-test mint_negative_and_zero_token_value() fail {
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
-  let tx1 = test_utils.create_transaction(vkh, [(policy_id, asset_name, -1)])
-  let tx2 = test_utils.create_transaction(vkh, [(policy_id, asset_name, 0)])
-
-  and {
-    register_products.register_products.mint(redeemer, policy_id, tx1),
-    register_products.register_products.mint(redeemer, policy_id, tx2),
+  Transaction {
+    ..transaction.placeholder,
+    inputs: [input],
+    outputs: outputs,
+    fee: 2_000_000,
+    mint: mint_value,
   }
 }
 
-test mint_different_signature() fail {
-  let signature: Signature =
-    #"dbe2289e331a4a5040482a965d76545e5ccaf8e15338f475129dc429de110dcf4e521d683d9900340c6272a05f925f59208bd1bfb1a17fc0e8a4db4ea6b4db03"
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
-  let tx = test_utils.create_transaction(vkh, [asset])
-
-  register_products.register_products.mint(redeemer, policy_id, tx)
+fn contain_value(opt: Option<a>) -> Bool {
+  when opt is {
+    Some(_) -> True
+    None -> False
+  }
 }
 
-/// This test simulate the scenario when an attacker tries with
-/// a replay attack to execute a transaction using the same input.
-/// This is blocked by checking if the sender's public key correspond
-/// to the public key inside the redeemer field.
-test mint_different_verification_key() fail {
-  let wrong_verification_key =
-    #"41aead46286a782598104b719b6fc750c56b9dcea58090a37d38596f41eaea4f"
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
-  let vkh = blake2b_224(wrong_verification_key)
-  let tx = test_utils.create_transaction(vkh, [asset])
+test mint() {
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
 
-  register_products.register_products.mint(redeemer, policy_id, tx)
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+test mint_with_other_assets_in_output() {
+  let other_asset: Value =
+    assets.from_asset(
+      #"123f5f6e616d655f746f6b656e",
+      #"0014df104d45525f544f4b454e",
+      99,
+    )
+  let assets =
+    [
+      TestAssetData(nft_asset, None, None),
+      TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      TestAssetData(other_asset, None, None),
+    ]
+  let tx = create_transaction(vkh, assets, mint_value)
+
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+// It will fail because of two rnft with the same amount.
+// We cannot mint more than one nft-rnft couple, because we then
+// don't know who belongs to what
+test mint_two_assets() fail {
+  let second_nft_asset =
+    assets.from_asset(policy_id, register_products.nft_asset_name, 1100)
+  let second_datum =
+    CIP68Datum {
+      ..datum,
+      metadata: list.push(
+        pairs.delete_first(metadata, string.to_bytearray(@"name")),
+        Pair(
+          cast_to_data(string.to_bytearray(@"name")),
+          cast_to_data(string.to_bytearray(@"Melons")),
+        ),
+      ),
+    }
+
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+        TestAssetData(second_nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(second_datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
+
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+test mint_different_policy_id() fail {
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
+  expect _ =
+    register_products.register_products.mint(
+      Void,
+      #"123f5f6e616d655f746f6b656e",
+      tx,
+    )
+}
+
+test mint_different_token_policy_id() fail {
+  let nft_asset =
+    assets.from_asset(
+      #"123f5f6e616d655f746f6b656e",
+      register_products.nft_asset_name,
+      quantity,
+    )
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(
+          rnft_asset,
+          Some(datum),
+          Some(#"123f5f6e616d655f746f6b656e"),
+        ),
+      ],
+      mint_value,
+    )
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+test mint_different_token_name() fail {
+  // label (222): 000de140 | YOLO_TOKEN: 594f4c4f5f544f4b454e
+  let nft_asset: Value =
+    assets.from_asset(policy_id, #"000de140594f4c4f5f544f4b454e", quantity)
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
+
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+test mint_negative_token_value() fail {
+  let nft_asset: Value =
+    assets.from_asset(policy_id, register_products.nft_asset_name, -1)
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
+
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+test mint_zero_token_value() fail {
+  let nft_asset: Value =
+    assets.from_asset(policy_id, register_products.nft_asset_name, 0)
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
+
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+test mint_empty_datum_product_name() fail {
+  let datum =
+    CIP68Datum {
+      ..datum,
+      metadata: list.push(
+        pairs.delete_first(metadata, string.to_bytearray(@"name")),
+        Pair(
+          cast_to_data(string.to_bytearray(@"name")),
+          cast_to_data(string.to_bytearray(@"")),
+        ),
+      ),
+    }
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
+
+  register_products.register_products.mint(Void, policy_id, tx)
+}
+
+test mint_empty_datum_measurement() fail {
+  let datum =
+    CIP68Datum {
+      ..datum,
+      extra: ExtraDatum { ..extra_datum, measurement: string.to_bytearray(@"") },
+    }
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
+
+  register_products.register_products.mint(Void, policy_id, tx)
 }
 
 // --------------
@@ -106,42 +328,183 @@ test mint_different_verification_key() fail {
 // function `mint` from the `register_products` validator.
 
 test get_mint_asset_with_wrong_policy_id() fail {
-  let tx = test_utils.create_transaction(vkh, [asset])
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
 
-  expect _ = register_products.get_mint_asset(tx, #"abcdef")
+  expect _ = register_products.get_mint_assets_amounts(tx, #"abcdef")
 }
 
 test get_mint_asset_with_different_asset_name() fail {
-  // label (333): 0014df10 | YOLO_TOKEN: 594f4c4f5f544f4b454e
-  let asset_name = #"0014df10594f4c4f5f544f4b454e"
+  // label (222): 000de140 | YOLO_TOKEN: 594f4c4f5f544f4b454e
+  let nft_asset_name = #"000de140594f4c4f5f544f4b454e"
+  let nft_asset: Value = assets.from_asset(policy_id, nft_asset_name, quantity)
   let tx =
-    test_utils.create_transaction(vkh, [(policy_id, asset_name, quantity)])
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
 
+  let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.get_mint_asset(tx, policy_id)
-      |> register_products.output_asset_must_contains_mint_asset(tx, policy_id, _)
+    utils.find_asset_output_by_asset_name(
+      tx,
+      policy_id,
+      register_products.nft_asset_name,
+      fn(asset_amount) {
+        and {
+          asset_amount > 0,
+          asset_amount == nft_amount,
+        }
+      },
+    )
 }
 
 test output_asset_must_contains_mint_asset_with_negative_token_value() fail {
-  let tx = test_utils.create_transaction(vkh, [(policy_id, asset_name, -1)])
+  let nft_asset: Value =
+    assets.from_asset(policy_id, register_products.nft_asset_name, -1)
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
 
+  let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.get_mint_asset(tx, policy_id)
-      |> register_products.output_asset_must_contains_mint_asset(tx, policy_id, _)
+    utils.find_asset_output_by_asset_name(
+      tx,
+      policy_id,
+      register_products.nft_asset_name,
+      fn(asset_amount) {
+        and {
+          asset_amount > 0,
+          asset_amount == nft_amount,
+        }
+      },
+    )
 }
 
 test output_asset_must_contains_mint_asset_zero_token_value() fail {
-  let tx = test_utils.create_transaction(vkh, [(policy_id, asset_name, 0)])
+  let nft_asset: Value =
+    assets.from_asset(policy_id, register_products.nft_asset_name, 0)
+  let tx =
+    create_transaction(
+      vkh,
+      [
+        TestAssetData(nft_asset, None, None),
+        TestAssetData(rnft_asset, Some(datum), Some(policy_id)),
+      ],
+      mint_value,
+    )
 
+  let (nft_amount, _) = register_products.get_mint_assets_amounts(tx, policy_id)
   expect _ =
-    register_products.get_mint_asset(tx, policy_id)
-      |> register_products.output_asset_must_contains_mint_asset(tx, policy_id, _)
+    utils.find_asset_output_by_asset_name(
+      tx,
+      policy_id,
+      register_products.nft_asset_name,
+      fn(asset_amount) {
+        and {
+          asset_amount > 0,
+          asset_amount == nft_amount,
+        }
+      },
+    )
 }
 
-test expect_signature_different_signature() fail {
-  let signature: Signature =
-    #"dbe2289e331a4a5040482a965d76545e5ccaf8e15338f475129dc429de110dcf4e521d683d9900340c6272a05f925f59208bd1bfb1a17fc0e8a4db4ea6b4db03"
-  let redeemer = RegisterProductsRedeemer(verification_key, message, signature)
+test check_metadata_different_field() {
+  and {
+    // missing one field
+    utils.check_metadata(
+      pairs.delete_first(metadata, string.to_bytearray(@"description")),
+    ) == False,
+    // One field of too much
+    utils.check_metadata(
+      list.push(
+        metadata,
+        Pair(
+          cast_to_data(string.to_bytearray(@"foo")),
+          cast_to_data(string.to_bytearray(@"bar")),
+        ),
+      ),
+    ) == False,
+  }
+}
 
-  expect _ = register_products.expect_signature(redeemer)
+test check_metadata_one_field_replaced_by_another() fail {
+  expect _ =
+    utils.check_metadata(
+      list.push(
+        pairs.delete_first(metadata, string.to_bytearray(@"description")),
+        Pair(
+          cast_to_data(string.to_bytearray(@"foo")),
+          cast_to_data(string.to_bytearray(@"bar")),
+        ),
+      ),
+    )
+}
+
+test check_metadata_one_field_removed_two_fields_repeated() fail {
+  utils.check_metadata(
+    list.push(
+      pairs.delete_first(metadata, string.to_bytearray(@"image")),
+      Pair(
+        cast_to_data(string.to_bytearray(@"description")),
+        cast_to_data(string.to_bytearray(@"bar")),
+      ),
+    ),
+  )
+}
+
+test check_metadata_wrong_type() fail {
+  let metadata =
+    list.push(
+      pairs.delete_first(metadata, string.to_bytearray(@"name")),
+      Pair(cast_to_data(string.to_bytearray(@"name")), cast_to_data(123)),
+    )
+
+  expect _ = utils.check_metadata(metadata)
+}
+
+test check_extra_metadata_wrong_values() {
+  and {
+    utils.check_extra_metadata(
+      ExtraDatum {
+        certificates: [],
+        harvest_date: 0,
+        expiration_date: 123,
+        measurement: "grams",
+      },
+    ) == False,
+    utils.check_extra_metadata(
+      ExtraDatum {
+        certificates: [],
+        harvest_date: 123,
+        expiration_date: 0,
+        measurement: "grams",
+      },
+    ) == False,
+    utils.check_extra_metadata(
+      ExtraDatum {
+        certificates: [],
+        harvest_date: 123,
+        expiration_date: 123,
+        measurement: "",
+      },
+    ) == False,
+  }
 }
