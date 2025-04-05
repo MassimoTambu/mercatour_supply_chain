@@ -27,7 +27,7 @@ When the producer sells the product to a reseller, ownership is transferred usin
 The producer or reseller can combine multiple products to create a new one (e.g., flour + eggs + ricotta cheese = pie). The new product inherits the full history of its ingredients. This transformation, along with ownership transfers, can occur as many times as needed throughout the supply chain.
 
 - **Sell to Consumer**:
-Once the product reaches the end customer, the tokens are burned. This marks the product as consumed and finalizes its lifecycle on-chain.
+Once the product reaches the end customer, the tokens are burned. This marks the product as consumed and finalizes its lifecycle on-chain. Resellers can also burn tokens for specific reasons without sending the tokens to the users, like if the consumer is not present on chain or if the products are expired.
 
 The complete product history — from creation to consumption — remains transparent and accessible on the platform, allowing users to trace the origins and transformations of any item.
 
