@@ -15,12 +15,11 @@ pub const nft_asset_name: AssetName = #"000de1404d45525f544f4b454e"
 pub const rnft_asset_name: AssetName = #"000643b04d45525f544f4b454e"
 
 validator register_products {
+  // TODO Manage multiple operations, like:
+  // - create more than one minting
+  // - Concatenate register with transfer of ownership
+  // TODO what to do in case of huge inputs? ("went over budget" err)
   mint(_redeemer: Data, policy_id: PolicyId, self: Transaction) {
-    // TODO Manage multiple operations, like:
-    // - create more than one minting
-    // - Concatenate register with transfer of ownership
-    // TODO what to do in case of huge inputs? ("went over budget" err)
-    trace @"inputs": self.inputs
     expect list.length(self.inputs) == 1
     // Check receiver is this validator address
     expect Some(input) = list.at(self.inputs, 0)
