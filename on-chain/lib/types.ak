@@ -1,3 +1,12 @@
+use aiken/crypto.{VerificationKeyHash}
+
+pub type Action {
+  Mint
+  ReMint
+  Burn
+  BurnAll
+}
+
 pub type CIP68Datum {
   // Inside metadata we have the following keys:
   // Standard metadata
@@ -14,4 +23,5 @@ pub type ExtraDatum {
   harvest_date: Int,
   expiration_date: Int,
   measurement: ByteArray,
+  owner: VerificationKeyHash,
 }

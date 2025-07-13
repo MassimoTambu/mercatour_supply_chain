@@ -24,6 +24,7 @@ pub fn find_asset_output_by_asset_name(
         } else {
           @"Found asset with correct policy_id and nft_asset_name"
         }
+        trace @"option_asset_amount": option_asset_amount
         when option_asset_amount is {
           None -> False
           Some(asset_amount) -> {
@@ -58,11 +59,14 @@ pub fn check_metadata(metadata: Pairs<Data, Data>) -> Bool {
   }
 }
 
-pub fn check_extra_metadata(extra: ExtraDatum) -> Bool {
+pub fn check_extra_metadata(self: Transaction, extra: ExtraDatum) -> Bool {
   trace @"Check extra metadata"
+  trace @"signs": self.extra_signatories
+  trace @"owner": extra.owner
   and {
     extra.harvest_date > 0,
     extra.expiration_date > 0,
     extra.measurement != "",
+    list.has(self.extra_signatories, extra.owner),
   }
 }

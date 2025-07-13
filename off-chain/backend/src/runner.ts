@@ -4,6 +4,7 @@ import { Lucid, LucidEvolution } from "@lucid-evolution/lucid";
 import { Blockfrost } from "@lucid-evolution/provider";
 import * as sqlite3 from 'sqlite3';
 import { SupplyChainWallet } from "./interfaces/supply_chain_wallet.ts";
+import { ProductMetadata } from "./interfaces/product_metadata.ts";
 
 export class SupplyChainRunner {
   private lucid: LucidEvolution = null!;
@@ -67,11 +68,28 @@ export class SupplyChainRunner {
   //   this.closeDatabase();
   // }
 
-  async registerProducts(addresses: SupplyChainWallet[]) {
+  async registerProducts(addresses: SupplyChainWallet[], products: ProductMetadata[]) {
     // this.openDatabase();
-    const txHashes = await SU.registerProducts(this.lucid, addresses);
+    const txHashes = await SU.registerProducts(this.lucid, addresses, products);
 
     // insertProducts(this.db, products);
+    // this.closeDatabase();
+  }
+
+
+  async reMintProducts(addresses: SupplyChainWallet[], products: ProductMetadata[]) {
+    // this.openDatabase();
+    const txHashes = await SU.reMintProducts(this.lucid, addresses, products);
+
+    // updatesProducts(this.db, products);
+    // this.closeDatabase();
+  }
+
+  async burnProducts(addresses: SupplyChainWallet[], products: ProductMetadata[]) {
+    // this.openDatabase();
+    const txHashes = await SU.burnProducts(this.lucid, addresses, products);
+    // insertBurnedProducts(this.db, txHashes);
+    // TODO add change to burned products
     // this.closeDatabase();
   }
 }
