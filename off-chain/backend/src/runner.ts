@@ -4,7 +4,7 @@ import { Lucid, LucidEvolution } from "@lucid-evolution/lucid";
 import { Blockfrost } from "@lucid-evolution/provider";
 import * as sqlite3 from 'sqlite3';
 import { SupplyChainWallet } from "./interfaces/supply_chain_wallet.ts";
-import { ProductMetadata } from "./interfaces/product_metadata.ts";
+import { ProductAction } from "./interfaces/product_action.ts";
 
 export class SupplyChainRunner {
   private lucid: LucidEvolution = null!;
@@ -68,26 +68,34 @@ export class SupplyChainRunner {
   //   this.closeDatabase();
   // }
 
-  async registerProducts(addresses: SupplyChainWallet[], products: ProductMetadata[]) {
+  async mintProducts(inputActions: ProductAction[]) {
     // this.openDatabase();
-    const txHashes = await SU.registerProducts(this.lucid, addresses, products);
+    const txHashes = await SU.mintProducts(this.lucid, inputActions);
 
     // insertProducts(this.db, products);
     // this.closeDatabase();
   }
 
 
-  async reMintProducts(addresses: SupplyChainWallet[], products: ProductMetadata[]) {
+  async reMintProducts(inputActions: ProductAction[]) {
     // this.openDatabase();
-    const txHashes = await SU.reMintProducts(this.lucid, addresses, products);
+    const txHashes = await SU.reMintProducts(this.lucid, inputActions);
 
     // updatesProducts(this.db, products);
     // this.closeDatabase();
   }
 
-  async burnProducts(addresses: SupplyChainWallet[], products: ProductMetadata[]) {
+  async burnProducts(inputActions: ProductAction[]) {
     // this.openDatabase();
-    const txHashes = await SU.burnProducts(this.lucid, addresses, products);
+    const txHashes = await SU.burnProducts(this.lucid, inputActions);
+    // insertBurnedProducts(this.db, txHashes);
+    // TODO add change to burned products
+    // this.closeDatabase();
+  }
+
+  async burnAllProducts(inputActions: ProductAction[]) {
+    // this.openDatabase();
+    const txHashes = await SU.burnAllProducts(this.lucid, inputActions);
     // insertBurnedProducts(this.db, txHashes);
     // TODO add change to burned products
     // this.closeDatabase();

@@ -31,8 +31,8 @@ pub fn find_asset_output_by_asset_name(
             trace @"Check asset amount": when
               check_asset_amount(asset_amount)
             is {
-              True -> @"Passed"
-              _ -> @"Failed"
+              True -> @"is passed"
+              _ -> @"is failed"
             }
             check_asset_amount(asset_amount)
           }
@@ -60,9 +60,6 @@ pub fn check_metadata(metadata: Pairs<Data, Data>) -> Bool {
 }
 
 pub fn check_extra_metadata(self: Transaction, extra: ExtraDatum) -> Bool {
-  trace @"Check extra metadata"
-  trace @"signs": self.extra_signatories
-  trace @"owner": extra.owner
   and {
     extra.harvest_date > 0,
     extra.expiration_date > 0,

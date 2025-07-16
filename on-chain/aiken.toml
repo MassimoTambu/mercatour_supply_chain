@@ -16,11 +16,6 @@ version = "v2.2.0"
 source = "github"
 
 [[dependencies]]
-name = "aiken-lang/fuzz"
-version = "v2.2.0"
-source = "github"
-
-[[dependencies]]
 name = "aiken-extra/test_kit"
 version = "0.0.2"
 source = "github"
